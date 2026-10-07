@@ -1,0 +1,35 @@
+# Embedding comparison — baseline vs one biomedical candidate, pilot only.
+# The ONLY experimental variable is the embedding model: same 200 abstracts,
+# same sentence splits, same fixed S1 chunk boundaries, same cosine
+# methodology, no model-specific tuning.
+experiment:
+  name: embedding_comparison_pilot
+  corpus: data/processed/pilot_corpus.jsonl
+  # Fixed chunk boundaries from the retained Phase 2 configuration.
+  chunks: data/processed/chunks_semantic_s1_current.jsonl
+  cache_dir: data/processed/embeddings_cache
+  out_dir: results/embeddings_comparison
+
+models:
+  baseline:
+    # Required project baseline (sentence-transformers).
+    model_name: sentence-transformers/all-MiniLM-L6-v2
+    normalize: false
+    device: cpu
+    batch_size: 64
+  candidate:
+    # PubMedBERT (pre-trained on PubMed abstracts + full text) fine-tuned
+    # for retrieval-style semantic similarity on MS MARCO, in
+    # sentence-transformers bi-encoder format: same API and pooling as the
+    # baseline, so the comparison is fair.
+    model_name: pritamdeka/S-PubMedBert-MS-MARCO
+    normalize: false
+    device: cpu
+    batch_size: 32
+
+evaluation:
+  # Title -> abstract-sentence retrieval. Positives/negatives come from
+  # corpus structure only (a title is relevant to its own abstract's
+  # sentences): no model-derived labels, no leakage.
+  title_retrieval:
+    recall_k: [1, 5, 10]
