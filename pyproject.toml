@@ -3,13 +3,24 @@ name = "scientific-literature-graphrag"
 version = "0.1.0"
 description = "GraphRAG for scientific literature — advanced biomedical research QA (research prototype)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
+# NOTE: This project intentionally supports Python >=3.10,<3.13 (verified failure on 3.13).
+# Our pinned spaCy 3.7.5 / thinc 8.2.5 / blis 0.7.11 chain provides no usable
+# Python 3.13 ARM64 wheel path, so pip falls back to a failing blis source build.
+# scispaCy 0.6.2 additionally declares requires_python<3.13.
+# Therefore Python 3.12 is the supported, reproducible environment (see scripts/setup_env.sh).
 license = { text = "MIT" }
 authors = [{ name = "Keval Shah" }]
 dependencies = [
     "sentence-transformers>=2.2",
-    "scispacy>=0.5.4",
-    "spacy>=3.7",
+    # Pinned exact: spaCy 3.7.5 is the newest 3.7.x with cp312 macOS-ARM64 wheels
+    # (3.7.6 ships macOS x86_64 only). scispaCy 0.6.2 needs spacy>=3.7,<3.9.
+    "spacy==3.7.5",
+    # Pinned exact: 0.6.2 is the scispaCy line that installs on Python 3.12
+    # (0.5.4 pins scipy<1.11, which has no cp312 wheels at all).
+    "scispacy==0.6.2",
+    # scispaCy 0.6.2 requires numpy<2.0; keep the whole env on the 1.x line.
+    "numpy>=1.24,<2.0",
     "hdbscan>=0.8",
     "scikit-learn>=1.3",
     "neo4j>=5.0",
