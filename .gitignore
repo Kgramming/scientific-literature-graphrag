@@ -1,0 +1,51 @@
+# --- secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env-venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- data (large / regenerable; provenance manifests live in data/evaluation/) ---
+data/raw/
+data/interim/
+data/processed/
+results/
+models/
+*.parquet
+*.jsonl
+!data/evaluation/*.json
+!data/evaluation/*.jsonl
+
+# --- neo4j / docker ---
+neo4j_data/
+*.dump
+
+# --- streamlit ---
+.streamlit/secrets.toml
+
+# --- notebooks ---
+.ipynb_checkpoints/
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.log

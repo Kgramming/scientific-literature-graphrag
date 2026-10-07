@@ -1,0 +1,44 @@
+# System E — D + cross-encoder rerank + graph-aware final score. Isolates reranking.
+experiment:
+  name: "E_reranked"
+  seed: 42
+chunking:
+  strategy: fixed_token
+  token_limit: 256
+  overlap: 32
+embeddings:
+  model: all-MiniLM-L6-v2
+  dim: 384
+entities:
+  extractor: en_ner_bc5cdr_md
+retrieval:
+  strategies: [vector, entity_aware, graph_expansion]
+  vector_top_k: 50
+  final_top_k: 10
+fusion:
+  method: rrf
+  rrf_k: 60
+  weights: {vector: 0.6, entity: 0.25, graph_proximity: 0.15}
+graph_expansion:
+  enabled: true
+  max_depth: 2
+  max_expanded_chunks: 500
+  min_shared_entities: 2
+  hub_degree_cap: 1000
+reranker:
+  cross_encoder_enabled: true
+  cross_encoder_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  rerank_pool_size: 50
+  keep_top_n: 10
+  graph_aware_enabled: true
+  graph_aware_weights: {vector: 0.35, graph_proximity: 0.15, entity_overlap: 0.15, reranker: 0.30, evidence_quality: 0.05}
+  pagerank_enabled: false
+  community_enabled: false
+query:
+  classification_enabled: true
+  decomposition_enabled: false
+generation:
+  enabled: true
+evaluation:
+  retrieval_metrics: [recall@5, recall@10, mrr, ndcg@10, precision@5]
+  generation_metrics: [rouge-l, bertscore, faithfulness]

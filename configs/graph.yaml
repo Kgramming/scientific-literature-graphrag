@@ -1,0 +1,38 @@
+# System C — A + entity-aware retrieval + bounded graph expansion. Isolates expansion.
+# NOTE: fixed-token chunks (same as A) so chunking is not a confound.
+experiment:
+  name: "C_vector_plus_graph_expansion"
+  seed: 42
+chunking:
+  strategy: fixed_token
+  token_limit: 256
+  overlap: 32
+embeddings:
+  model: all-MiniLM-L6-v2
+  dim: 384
+entities:
+  extractor: en_ner_bc5cdr_md
+retrieval:
+  strategies: [vector, entity_aware, graph_expansion]
+  vector_top_k: 50
+  final_top_k: 10
+fusion:
+  method: weighted
+  weights: {vector: 0.6, entity: 0.25, graph_proximity: 0.15}
+graph_expansion:
+  enabled: true
+  max_depth: 2
+  max_expanded_chunks: 500
+  min_shared_entities: 2
+  hub_degree_cap: 1000
+reranker:
+  cross_encoder_enabled: false
+  graph_aware_enabled: false
+query:
+  classification_enabled: false
+  decomposition_enabled: false
+generation:
+  enabled: true
+evaluation:
+  retrieval_metrics: [recall@5, recall@10, mrr, ndcg@10, precision@5]
+  generation_metrics: [rouge-l, bertscore, faithfulness]

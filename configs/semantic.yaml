@@ -1,0 +1,31 @@
+# System B — A + improved semantic chunking. Isolates the chunking effect.
+experiment:
+  name: "B_semantic_chunking"
+  seed: 42
+chunking:
+  strategy: semantic_sections
+  min_sentences: 2
+  max_tokens: 512
+  breakpoint_percentile: 15
+embeddings:
+  model: all-MiniLM-L6-v2
+  dim: 384
+retrieval:
+  strategies: [vector]
+  vector_top_k: 50
+  final_top_k: 10
+fusion:
+  method: none
+graph_expansion:
+  enabled: false
+reranker:
+  cross_encoder_enabled: false
+  graph_aware_enabled: false
+query:
+  classification_enabled: false
+  decomposition_enabled: false
+generation:
+  enabled: true
+evaluation:
+  retrieval_metrics: [recall@5, recall@10, mrr, ndcg@10, precision@5]
+  generation_metrics: [rouge-l, bertscore, faithfulness]
