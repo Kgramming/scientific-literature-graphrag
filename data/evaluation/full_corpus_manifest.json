@@ -1,0 +1,138 @@
+{
+  "project": "scientific-literature-graphrag",
+  "phase": "phase3a_full_corpus",
+  "corpus_name": "full_5000",
+  "source": {
+    "qa_dataset": "qiaojin/PubMedQA",
+    "qa_configs": [
+      "pqa_labeled",
+      "pqa_unlabeled"
+    ],
+    "qa_split": "train",
+    "qa_questions_labeled": 1000,
+    "qa_questions_unlabeled": 61249,
+    "datasets_library": "5.1.0",
+    "pmid_selection": {
+      "n_input": 62249,
+      "n_unique_numeric": 5000,
+      "n_skipped_non_numeric": 0,
+      "n_selected": 5000,
+      "selection_rule": "first-n numeric pubids in dataset split order, deduped",
+      "pmid_list_sha256": "8df28256df1425c68f9151244129cd03f1ee63d7956ef1efea8febc6b12db5c7"
+    },
+    "abstract_source": "NCBI Entrez efetch (db=pubmed, retmode=xml, 50/batch)",
+    "raw_batches": "data/raw/full_efetch_batch_*.xml"
+  },
+  "retrieval_date_utc": "2026-10-07T20:16:10.952416+00:00",
+  "requested": 5000,
+  "retrieved": 5000,
+  "retained": 4994,
+  "dropped": {
+    "count": 0,
+    "reasons": {},
+    "pmids": []
+  },
+  "pmid_coverage": 1.0,
+  "filtering_criteria": "Deterministic: first 5000 numeric pubids of PubMedQA pqa_labeled/train then pqa_unlabeled/train in split order (deduped); the 200-abstract pilot is a strict subset. No content filtering before audit; records with missing/empty abstracts are flagged, not silently dropped.",
+  "audit_summary": {
+    "total": 5000,
+    "with_abstract": 5000,
+    "missing_abstract": 0,
+    "empty_abstract": 0,
+    "missing_title": 0,
+    "missing_year": 6,
+    "missing_journal": 0,
+    "invalid_pmid": 0,
+    "duplicate_pmid_groups": [],
+    "duplicate_text_groups": [],
+    "year_mismatches": [],
+    "pmid_coverage": 1.0,
+    "n_duplicate_pmid_groups": 0,
+    "n_duplicate_text_groups": 0,
+    "retained": 4994,
+    "retained_with_warnings": 6,
+    "distributions": {
+      "n_records": 5000,
+      "years": {
+        "n_present": 4994,
+        "min": 1989,
+        "max": 2017,
+        "median": 2011.0,
+        "by_year": {
+          "1989": 2,
+          "1990": 5,
+          "1991": 8,
+          "1992": 1,
+          "1993": 23,
+          "1994": 17,
+          "1995": 61,
+          "1996": 100,
+          "1997": 162,
+          "1998": 15,
+          "1999": 20,
+          "2000": 149,
+          "2001": 69,
+          "2002": 207,
+          "2003": 188,
+          "2004": 46,
+          "2005": 356,
+          "2006": 97,
+          "2007": 192,
+          "2008": 286,
+          "2009": 267,
+          "2010": 155,
+          "2011": 92,
+          "2012": 276,
+          "2013": 344,
+          "2014": 663,
+          "2015": 538,
+          "2016": 593,
+          "2017": 62
+        }
+      },
+      "abstract_chars": {
+        "min": 531,
+        "max": 4471,
+        "median": 1680.0,
+        "mean": 1698.3
+      },
+      "top_journals": {
+        "PloS one": 81,
+        "Clinical orthopaedics and related research": 45,
+        "The Journal of urology": 44,
+        "Surgical endoscopy": 34,
+        "BJU international": 33,
+        "Urology": 31,
+        "Spine": 31,
+        "Stroke": 30,
+        "American journal of surgery": 28,
+        "The journal of maternal-fetal & neonatal medicine : the official journal of the European Association of Perinatal Medicine, the Federation of Asia and Oceania Perinatal Societies, the International Society of Perinatal Obstetricians": 26
+      },
+      "n_distinct_journals": 1445
+    }
+  },
+  "pubmedqa_mapping": {
+    "n_pilot_pmids": 5000,
+    "n_mapped": 5000,
+    "n_unmapped": 0,
+    "unmapped_pmids": [],
+    "n_duplicate_mappings": 0,
+    "duplicate_mappings": {},
+    "method": "pmid_equality_only",
+    "note": "Pilot PMIDs were drawn from PubMedQA question pubids, so mapping is by construction; duplicates would indicate a pubid shared by multiple questions."
+  },
+  "provenance": {
+    "scripts": [
+      "scripts/build_full_corpus.py",
+      "scripts/audit_full_corpus.py"
+    ],
+    "modules": [
+      "sgrag.data.pubmed_fetch",
+      "sgrag.data.pilot",
+      "sgrag.data.audit",
+      "sgrag.data.manifest"
+    ],
+    "python": "3.12.3",
+    "audit_seconds": 0.5
+  }
+}

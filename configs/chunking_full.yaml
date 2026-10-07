@@ -1,0 +1,28 @@
+# Phase 3A chunking at scale — IDENTICAL parameters to the validated pilot.
+# Do not retune: any change here breaks comparability with Phase 2.
+experiment:
+  name: phase3a_chunking_full
+  corpus: data/processed/full_corpus.jsonl
+  out_dir: data/processed/full_chunks
+
+strategies:
+  fixed_token:
+    token_limit: 256
+    overlap: 32
+    tokenizer_model: sentence-transformers/all-MiniLM-L6-v2
+  sentence_boundary:
+    max_tokens: 256
+    tokenizer_model: sentence-transformers/all-MiniLM-L6-v2
+  semantic_cluster:
+    embedding_model: all-MiniLM-L6-v2
+    clustering: hdbscan
+    min_cluster_size: 2
+    metric: euclidean
+    min_sentences: 3
+    max_tokens: 256
+    normalize_embeddings: false
+    tokenizer_model: sentence-transformers/all-MiniLM-L6-v2
+
+evaluation:
+  coherence_model: all-MiniLM-L6-v2
+  out_dir: results/full_corpus

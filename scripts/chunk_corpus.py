@@ -25,6 +25,9 @@ def main():
     sanitize_proxy_env()
     ap = argparse.ArgumentParser(description="Chunk the pilot corpus (3 strategies).")
     ap.add_argument("--config", default="configs/chunking_pilot.yaml")
+    ap.add_argument("--cache-dir", default=None,
+                    help="disk cache for sentence embeddings (sgrag.embeddings); "
+                         "recommended at scale so reruns skip recomputation")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(open(args.config, encoding="utf-8"))
@@ -41,8 +44,19 @@ def main():
         diag = []
         n_chunks = 0
         # Load the embedding model once for the semantic strategy.
-        embed_fn = (semantic_embed_fn(s_cfg.embedding_model)
-                    if strategy == "semantic_cluster" else None)
+        # With --cache-dir, per-article embeddings go through the disk cache
+        # (the chunking algorithm itself is unchanged).
+        if strategy == "semantic_cluster" and args.cache_dir:
+            from sgrag.embeddings import EmbeddingConfig, encode as cached_encode
+            ecfg = EmbeddingConfig(model_name=s_cfg.embedding_model,
+                                   cache_dir=args.cache_dir)
+
+            def embed_fn(sents, _ecfg=ecfg):
+                embs, _ = cached_encode(list(sents), _ecfg)
+                return embs
+        else:
+            embed_fn = (semantic_embed_fn(s_cfg.embedding_model)
+                        if strategy == "semantic_cluster" else None)
         with open(out_path, "w", encoding="utf-8") as f:
             for rec in records:
                 if strategy == "semantic_cluster":

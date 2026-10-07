@@ -30,6 +30,9 @@ def main():
     sanitize_proxy_env()
     ap = argparse.ArgumentParser(description="Evaluate chunking strategies.")
     ap.add_argument("--config", default="configs/chunking_pilot.yaml")
+    ap.add_argument("--cache-dir", default=None,
+                    help="disk cache for sentence embeddings (sgrag.embeddings); "
+                         "shares entries with chunk_corpus.py --cache-dir")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(open(args.config, encoding="utf-8"))
@@ -48,15 +51,24 @@ def main():
         print(f"[eval] {s}: {len(chunks[s])} chunks")
 
     # Sentence embeddings per article (computed once, shared by all strategies).
-    from sentence_transformers import SentenceTransformer
     model_name = cfg["evaluation"]["coherence_model"]
-    model = SentenceTransformer(model_name)
+    if args.cache_dir:
+        from sgrag.embeddings import EmbeddingConfig, encode as cached_encode
+        ecfg = EmbeddingConfig(model_name=model_name, cache_dir=args.cache_dir)
+        model = None
+    else:
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer(model_name)
     art_sentences, art_embs = {}, {}
     for pmid, rec in records.items():
         sents = split_sentences(rec.get("abstract") or "")
         art_sentences[pmid] = sents
-        art_embs[pmid] = np.asarray(model.encode(sents, show_progress_bar=False)) \
-            if sents else np.zeros((0, 1))
+        if not sents:
+            art_embs[pmid] = np.zeros((0, 1))
+        elif args.cache_dir:
+            art_embs[pmid], _ = cached_encode(sents, ecfg)
+        else:
+            art_embs[pmid] = np.asarray(model.encode(sents, show_progress_bar=False))
 
     report = {"strategies": {}, "config": cfg["strategies"],
               "coherence_model": model_name, "n_articles": len(records)}
