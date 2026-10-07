@@ -1,0 +1,74 @@
+{
+  "project": "scientific-literature-graphrag",
+  "phase": "phase1_pilot",
+  "corpus_name": "pilot_200",
+  "source": {
+    "qa_dataset": "qiaojin/PubMedQA",
+    "qa_config": "pqa_labeled",
+    "qa_split": "train",
+    "qa_questions": 1000,
+    "datasets_library": "5.1.0",
+    "pmid_selection": {
+      "n_input": 1000,
+      "n_unique_numeric": 200,
+      "n_skipped_non_numeric": 0,
+      "n_selected": 200,
+      "selection_rule": "first-n numeric pubids in dataset split order, deduped",
+      "pmid_list_sha256": "a243d0383e5315ce8308f881242fe4adb7e138ee28aef0916a2d505e8d106bfc"
+    },
+    "abstract_source": "NCBI Entrez efetch (db=pubmed, retmode=xml, 50/batch)",
+    "raw_batches": "data/raw/efetch_batch_*.xml"
+  },
+  "retrieval_date_utc": "2026-10-07T17:54:29.928698+00:00",
+  "requested": 200,
+  "retrieved": 200,
+  "retained": 200,
+  "dropped": {
+    "count": 0,
+    "reasons": {},
+    "pmids": []
+  },
+  "pmid_coverage": 1.0,
+  "filtering_criteria": "Deterministic: first 200 numeric pubids of PubMedQA pqa_labeled/train in split order (deduped). No content filtering before audit; records with missing/empty abstracts are flagged, not silently dropped.",
+  "audit_summary": {
+    "total": 200,
+    "with_abstract": 200,
+    "missing_abstract": 0,
+    "empty_abstract": 0,
+    "missing_title": 0,
+    "missing_year": 0,
+    "missing_journal": 0,
+    "invalid_pmid": 0,
+    "duplicate_pmid_groups": [],
+    "duplicate_text_groups": [],
+    "year_mismatches": [],
+    "pmid_coverage": 1.0,
+    "n_duplicate_pmid_groups": 0,
+    "n_duplicate_text_groups": 0,
+    "retained": 200,
+    "retained_with_warnings": 0
+  },
+  "pubmedqa_mapping": {
+    "n_pilot_pmids": 200,
+    "n_mapped": 200,
+    "n_unmapped": 0,
+    "unmapped_pmids": [],
+    "n_duplicate_mappings": 0,
+    "duplicate_mappings": {},
+    "method": "pmid_equality_only",
+    "note": "Pilot PMIDs were drawn from PubMedQA question pubids, so mapping is by construction; duplicates would indicate a pubid shared by multiple questions."
+  },
+  "provenance": {
+    "scripts": [
+      "scripts/build_pilot_corpus.py",
+      "scripts/audit_pilot.py"
+    ],
+    "modules": [
+      "sgrag.data.pubmed_fetch",
+      "sgrag.data.pilot",
+      "sgrag.data.audit",
+      "sgrag.data.manifest"
+    ],
+    "python": "3.12.3"
+  }
+}
