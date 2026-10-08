@@ -1,0 +1,36 @@
+# Knowledge-graph build configuration (Phase 3B).
+# Secrets are NEVER stored here: the Neo4j password comes from SGRAG_NEO4J_PASSWORD.
+# Optional env overrides: SGRAG_NEO4J_URI, SGRAG_NEO4J_USER.
+# NOTE: configs/graph.yaml is the System-C retrieval experiment config; this
+# file configures the graph BUILD.
+
+neo4j:
+  uri: bolt://localhost:7687
+  user: neo4j
+  database: neo4j
+
+ingestion:
+  # Chunk strategy used for ALL graph nodes. semantic_cluster (S1) is the
+  # validated/retained configuration: best coherence gap (+0.259 full corpus),
+  # highest intra-chunk coherence (0.623), and small coherent units that give
+  # precise entity provenance. Strategies are never mixed within one build.
+  chunk_strategy: semantic_cluster
+  batch_size: 1000
+
+entities:
+  model: en_ner_bc5cdr_md
+  batch_size: 256
+  allowed_types: [DISEASE, CHEMICAL]
+
+similarity:
+  # Bounded rule: exactly top_k outgoing SEMANTIC_SIMILAR edges per chunk,
+  # self matches excluded. No all-pairs graph is ever materialized.
+  top_k: 5
+  metric: cosine
+  embedding_model: all-MiniLM-L6-v2
+
+vector_index:
+  name: chunk_embedding_idx
+  dimensions: 384
+  similarity_function: cosine
+  embedding_model: all-MiniLM-L6-v2
