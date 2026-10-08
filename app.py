@@ -1,27 +1,19 @@
-"""Scientific Literature GraphRAG — Streamlit research application (Phase 1 UI Polish).
+"""Scientific Literature GraphRAG — research application.
+
+"Ink & Amber" editorial design: warm paper background, serif display type,
+amber accent. Same backend as the Kiro baseline (hybrid retrieval, rerank,
+grounded generation, citation validation); all functionality preserved.
 
 Launch:
     .venv/bin/streamlit run app.py
-
-Requires Neo4j running with the Phase 3B graph. LLM generation uses
-SGRAG_LLM_PROVIDER (default "mock" — clearly labeled; set to "groq" with
-SGRAG_LLM_API_KEY for live answers).
-
-Phase 1 polish focuses on:
-- Professional research-oriented layout
-- Clean header and navigation
-- Improved query experience with example cards
-- Better answer and citation presentation
-- Organized evidence display
-- Transparent retrieval metadata
-- Responsive, spacious design
 """
 
 from __future__ import annotations
 
+import json
 import logging
-import os
 import sys
+import textwrap
 import traceback
 from pathlib import Path
 
@@ -37,23 +29,144 @@ from sgrag.viz import build_evidence_graph, render_pyvis_html  # noqa: E402
 log = logging.getLogger("sgrag.app")
 
 EXAMPLES = [
-    "What are the risk factors associated with Alzheimer's disease?",
-    "What drugs are associated with breast cancer treatment?",
-    "How does inflammation affect cardiovascular disease?",
+    ("Risk factors & mechanisms",
+     "What are the risk factors associated with Alzheimer's disease?"),
+    ("Treatments & drugs",
+     "What drugs are associated with breast cancer treatment?"),
+    ("Cross-domain relationships",
+     "How does inflammation affect cardiovascular disease?"),
 ]
 
-# Benchmark corpus statistics (labeled as such, not live values)
-CORPUS_STATS = {
-    "articles": "5,000",
-    "chunks": "53,091",
-    "entities": "9,945",
-    "semantic edges": "265,455",
-}
+CORPUS_STATS = [
+    ("Articles", "5,000"),
+    ("Chunks", "53,091"),
+    ("Entities", "9,945"),
+    ("Semantic edges", "265,455"),
+]
 
+# ============================================================ DESIGN SYSTEM ====
+
+CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=Inter:wght@400;500;600&display=swap');
+
+/* base */
+html, body, [class*="css"] { font-family: 'Inter', system-ui, sans-serif; }
+.block-container { max-width: 1080px; padding-top: 2rem; }
+
+/* hero */
+.hero { margin: 0.5rem 0 1.75rem 0; }
+.hero h1 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-weight: 700; font-size: 2.6rem; line-height: 1.15;
+    color: #1C1E21; margin: 0;
+}
+.hero p {
+    font-size: 1.02rem; color: #5B5F66; margin: 0.6rem 0 0 0; max-width: 640px;
+}
+.pill-row { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+.pill {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em;
+    padding: 0.3rem 0.7rem; border-radius: 999px;
+    background: #FFFFFF; border: 1px solid #E5DFD3; color: #4A4E54;
+}
+.pill .dot { width: 7px; height: 7px; border-radius: 50%; background: #16A34A; }
+.pill.mock .dot { background: #B45309; }
+
+/* cards */
+.card {
+    background: #FFFFFF; border: 1px solid #E8E3D8; border-radius: 14px;
+    padding: 1.35rem 1.5rem; margin-bottom: 1rem;
+    box-shadow: 0 1px 2px rgba(28,30,33,0.04), 0 8px 24px -18px rgba(28,30,33,0.25);
+}
+.card h3 { font-family: 'Source Serif 4', Georgia, serif; font-size: 1.25rem;
+           margin: 0 0 0.75rem 0; color: #1C1E21; }
+.answer-card { border-left: 4px solid #B45309; }
+.answer-card .answer-text { font-size: 0.98rem; line-height: 1.75; color: #24272C; }
+.answer-card .answer-text p { margin: 0 0 0.75rem 0; }
+
+/* citation chips */
+.cite-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.9rem; }
+.cite-row a.cite-chip, .cite-row span.cite-chip {
+    display: inline-flex; align-items: baseline; gap: 0.3rem;
+    background: #1E3A5F; color: #F8F6F1 !important; border-radius: 8px;
+    padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600;
+    text-decoration: none !important;
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+.cite-row a.cite-chip *, .cite-row span.cite-chip * { color: #F8F6F1 !important; }
+.cite-chip:hover { transform: translateY(-1px); box-shadow: 0 4px 10px -4px rgba(30,58,95,.5); }
+.cite-chip .chunk { font-weight: 400; opacity: 0.75; font-size: 0.7rem; }
+.cite-chip .ext { opacity: 0.6; font-size: 0.7rem; }
+
+/* entity pills */
+.ent { display: inline-block; font-size: 0.72rem; font-weight: 600;
+       padding: 0.18rem 0.55rem; border-radius: 999px; margin: 0 0.3rem 0.3rem 0;
+       letter-spacing: 0.01em; }
+.ent-disease { background: #FDECEA; color: #9B2C2C; border: 1px solid #F5C6C0; }
+.ent-chemical { background: #E8F1FD; color: #1E4FA3; border: 1px solid #C4DBF7; }
+.ent-other { background: #F1EDE6; color: #5B5F66; border: 1px solid #E0DACA; }
+
+/* evidence */
+.ev-head { display: flex; justify-content: space-between; align-items: baseline;
+           gap: 1rem; margin-bottom: 0.35rem; }
+.ev-title { font-weight: 600; font-size: 0.95rem; color: #1C1E21; }
+.ev-pmid { font-size: 0.78rem; font-weight: 600; color: #B45309; white-space: nowrap; }
+.ev-meta { font-size: 0.76rem; color: #6B7078; margin: 0.35rem 0; }
+.ev-text { font-size: 0.9rem; line-height: 1.65; color: #33373D;
+           border-left: 2px solid #EDE7D9; padding-left: 0.9rem; margin-top: 0.6rem; }
+.scorebar { height: 5px; border-radius: 3px; background: #EFEAE0; margin-top: 0.25rem;
+            overflow: hidden; max-width: 220px; }
+.scorebar > div { height: 100%; border-radius: 3px;
+                  background: linear-gradient(90deg, #B45309, #F59E0B); }
+
+/* stat cards */
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;
+             margin: 1rem 0 1.5rem 0; }
+.stat { background: #FFFFFF; border: 1px solid #E8E3D8; border-radius: 12px;
+        padding: 0.9rem 1rem; }
+.stat .v { font-family: 'Source Serif 4', Georgia, serif; font-size: 1.45rem;
+           font-weight: 700; color: #1C1E21; }
+.stat .k { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em;
+           text-transform: uppercase; color: #8A8F98; margin-top: 0.15rem; }
+@media (max-width: 700px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* example cards */
+.ex-card { background: #FFFFFF; border: 1px solid #E8E3D8; border-radius: 12px;
+           padding: 0.9rem 1rem; height: 100%;
+           transition: border-color .15s ease, box-shadow .15s ease; }
+.ex-card:hover { border-color: #D9A441; box-shadow: 0 6px 18px -12px rgba(180,83,9,.45); }
+.ex-tag { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+          text-transform: uppercase; color: #B45309; }
+.ex-q { font-size: 0.85rem; color: #33373D; margin-top: 0.35rem; line-height: 1.5; }
+
+/* section titles */
+.sec-title { font-family: 'Source Serif 4', Georgia, serif; font-size: 1.45rem;
+             font-weight: 700; color: #1C1E21; margin: 2.2rem 0 0.25rem 0; }
+.sec-sub { font-size: 0.85rem; color: #6B7078; margin-bottom: 1rem; }
+
+/* sidebar */
+section[data-testid="stSidebar"] { background: #F4F0E8; }
+.side-stat { display: flex; justify-content: space-between; align-items: baseline;
+             padding: 0.3rem 0; border-bottom: 1px dashed #E0DACA; font-size: 0.85rem; }
+.side-stat b { font-family: 'Source Serif 4', Georgia, serif; font-size: 1rem; }
+
+/* footer */
+.footer { text-align: center; color: #9AA0A8; font-size: 0.75rem;
+          margin: 3rem 0 1rem 0; }
+</style>
+"""
+
+
+def inject_css():
+    st.markdown(CSS, unsafe_allow_html=True)
+
+
+# ============================================================ BACKEND (unchanged) ====
 
 @st.cache_resource(show_spinner=False)
 def get_generator(rerank_enabled: bool) -> GroundedGenerator:
-    """Cached: heavy model loads (MiniLM, scispaCy, CrossEncoder) happen once per rerank state."""
     import dataclasses
 
     from sgrag.retrieval import HybridRetriever
@@ -68,7 +181,6 @@ def get_generator(rerank_enabled: bool) -> GroundedGenerator:
 
 @st.cache_resource(show_spinner=False)
 def get_cached_gen_config():
-    """Cached generation config (stable across runs)."""
     return load_generation_config()
 
 
@@ -78,531 +190,375 @@ def ask_pipeline(query: str, rerank: bool):
 
 
 def make_pubmed_url(pmid: str) -> str:
-    """Create PubMed URL for a PMID. Safe: no fabrication."""
     if pmid and pmid.isdigit():
         return f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
     return ""
 
 
-def render_citation_badges(citations: list) -> None:
-    """Render citations as clean, interactive badges with PubMed links."""
-    if not citations:
-        return
-    badge_cols = st.columns(min(len(citations), 5))
-    for idx, citation in enumerate(citations):
-        col = badge_cols[idx % len(badge_cols)]
-        pmid = citation.pmid
-        chunk_label = f"<br><small>{citation.chunk_id}</small>" if citation.chunk_id else ""
-        pubmed_url = make_pubmed_url(pmid)
-        
-        if pubmed_url:
-            col.markdown(
-                f"<a href='{pubmed_url}' target='_blank' style='text-decoration: none;'>"
-                f"<div style='background-color: #f0f2f6; padding: 10px 12px; "
-                f"border-radius: 4px; text-align: center; font-size: 13px; "
-                f"cursor: pointer; transition: background-color 0.2s;'>"
-                f"<strong>PMID</strong><br><code>{pmid}</code>{chunk_label}"
-                f"</div></a>",
-                unsafe_allow_html=True
-            )
-        else:
-            col.markdown(
-                f"<div style='background-color: #f0f2f6; padding: 10px 12px; "
-                f"border-radius: 4px; text-align: center; font-size: 13px;'>"
-                f"<strong>PMID</strong><br><code>{pmid}</code>{chunk_label}"
-                f"</div>",
-                unsafe_allow_html=True
-            )
+def _shorten(text: str, width: int) -> str:
+    """Truncate at a word boundary (never mid-word) for titles."""
+    return textwrap.shorten(text or "Untitled", width=width, placeholder="…")
 
 
-def get_answer_with_citations(result) -> str:
-    """Format answer with citations for copying."""
-    lines = [result.answer]
-    if result.citations:
-        lines.append("\n\nCitations:")
-        for c in result.citations:
-            chunk_ref = f" [{c.chunk_id}]" if c.chunk_id else ""
-            lines.append(f"  [PMID:{c.pmid}]{chunk_ref}")
-    return "\n".join(lines)
+def entity_pill(entity: str) -> str:
+    kind = "other"
+    label = entity
+    if ":" in entity:
+        prefix, rest = entity.split(":", 1)
+        label = rest.strip()
+        if prefix.upper() == "DISEASE":
+            kind = "disease"
+        elif prefix.upper() == "CHEMICAL":
+            kind = "chemical"
+    safe = label.replace("<", "&lt;").replace(">", "&gt;")
+    return f'<span class="ent ent-{kind}">{safe}</span>'
 
 
-def render_answer_section(result) -> None:
-    """Render answer with strong visual hierarchy and integrated citations."""
-    st.divider()
-    
-    # Answer header with action buttons
-    col_header, col_actions = st.columns([3, 1])
-    with col_header:
-        st.markdown(
-            "<h2 style='margin: 0 0 1rem 0; color: #1c1f26;'>📝 Answer</h2>",
-            unsafe_allow_html=True
-        )
-    with col_actions:
-        # Copy answer button
-        answer_text = get_answer_with_citations(result)
-        st.write("")  # Spacing
-        if st.button("📋 Copy", use_container_width=True, key="btn_copy_answer",
-                     help="Copy answer with citations"):
-            st.session_state["_copy_success"] = True
-    
-    if st.session_state.get("_copy_success"):
-        st.success("Copied to clipboard (in a real implementation)")
-        st.session_state["_copy_success"] = False
-    
-    # Citation validation warning
-    if result.citation_validation and not result.citation_validation.valid:
-        st.warning(
-            "⚠️ Some citations could not be verified against the evidence and were removed. "
-            "The answer reflects only validated citations."
-        )
-    
-    # Main answer text with better typography
-    st.markdown(
-        f"""
-<div style='background-color: #fafbfc; padding: 1.5rem; border-radius: 6px; 
-            border-left: 4px solid #0366d6; line-height: 1.8; font-size: 15px;'>
-{result.answer}
-</div>
-        """,
-        unsafe_allow_html=True
-    )
-    
-    # General warnings
-    for w in result.warnings:
-        st.warning(f"⚠️ {w}")
-    
-    # Citations section
-    if result.citations:
-        st.subheader("📌 Citations", divider=False)
-        st.caption("Evidence sources supporting the claims above")
-        render_citation_badges(result.citations)
-
-
-def render_entity_badge(entity: str, badge_type: str = "DEFAULT") -> str:
-    """Render an entity badge with subtle styling."""
-    colors = {
-        "DISEASE": "#ffe6e6",
-        "CHEMICAL": "#e6f2ff",
-        "GENE": "#e6ffe6",
-        "DEFAULT": "#f0f0f0",
-    }
-    color = colors.get(badge_type, colors["DEFAULT"])
-    return (
-        f"<span style='background-color: {color}; padding: 2px 6px; "
-        f"border-radius: 3px; font-size: 12px; margin-right: 4px;'>"
-        f"{entity}</span>"
+def copy_to_clipboard(text: str):
+    """Real clipboard copy via a hidden component (user-gesture triggered)."""
+    components.html(
+        f"""<script>
+        navigator.clipboard.writeText({json.dumps(text)}).then(
+          () => {{ window.parent.postMessage({{type: 'sgrag-copied'}}, '*'); }},
+          () => {{}}
+        );
+        </script>""",
+        height=0,
     )
 
 
-def render_evidence_cards(evidence: list) -> None:
-    """Render evidence items as clean, organized cards grouped by PMID with entity display."""
-    if not evidence:
-        return
-    
-    # Group evidence by PMID
-    by_pmid = {}
-    for ev in evidence:
-        if ev.pmid not in by_pmid:
-            by_pmid[ev.pmid] = []
-        by_pmid[ev.pmid].append(ev)
-    
-    for pmid, items in by_pmid.items():
-        # Show title once per PMID
-        title = items[0].title
-        with st.expander(f"📄 PMID:{pmid} — {title[:80]}"):
-            
-            for idx, ev in enumerate(items):
-                if idx > 0:
-                    st.divider()
-                
-                # Chunk info and scores (compact layout)
-                col1, col2, col3 = st.columns([2, 2, 2])
-                with col1:
-                    st.caption(f"**Chunk:** `{ev.chunk_id}`")
-                with col2:
-                    if ev.reranker_score is not None:
-                        st.caption(f"**Reranker:** {ev.reranker_score:.3f}")
-                    else:
-                        st.caption("**Reranker:** —")
-                with col3:
-                    st.caption(f"**Score:** {ev.fused_score:.3f}")
-                
-                # Retrieval provenance (how was this found)
-                sources_text = ", ".join(ev.retrieval_sources) if ev.retrieval_sources else "—"
-                st.caption(f"**Found via:** {sources_text}")
-                
-                # Entities with subtle badges
-                if ev.matched_entities:
-                    entities_html = "".join([render_entity_badge(e) for e in ev.matched_entities])
-                    st.markdown(f"**Entities:** {entities_html}", unsafe_allow_html=True)
-                else:
-                    st.caption("**Entities:** —")
-                
-                # Evidence text (italics for distinction)
-                st.markdown(f"_{ev.text}_")
+# ============================================================ RENDER ====
 
-
-def render_retrieval_intelligence(result_md: dict, gen_md: dict) -> None:
-    """Render comprehensive retrieval intelligence for research users."""
-    md = result_md or {}
-    
-    # Query classification and decomposition
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        query_class = md.get("query_class", "—")
-        st.metric("Query Type", query_class, label_visibility="collapsed")
-    with col2:
-        entities = md.get("query_entities", [])
-        if entities:
-            entities_html = "".join([render_entity_badge(e) for e in entities])
-            st.markdown(f"**Detected Entities:** {entities_html}", unsafe_allow_html=True)
-        else:
-            st.caption("**Detected Entities:** —")
-    
-    # Retrieval strategy breakdown
-    st.subheader("Retrieval Strategy", divider=True)
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        n_vector = md.get("n_vector", 0)
-        st.metric("Vector Search", f"{n_vector} candidates", label_visibility="collapsed")
-        st.caption("Semantic similarity in embedding space")
-    with col2:
-        n_entity = md.get("n_entity", 0)
-        st.metric("Entity Graph", f"{n_entity} candidates", label_visibility="collapsed")
-        st.caption("Entity mentions + HDBSCAN expansion")
-    with col3:
-        n_fused = md.get("n_fused", 0)
-        st.metric("After Fusion", f"{n_fused} candidates", label_visibility="collapsed")
-        st.caption("Weighted normalization fusion")
-    
-    # Reranking info
-    if md.get("rerank_enabled"):
-        st.caption("✓ **CrossEncoder reranking active** — ms-marco-MiniLM-L-6-v2 reordering top candidates by relevance")
-    else:
-        st.caption("• CrossEncoder reranking disabled")
-    
-    # Latency breakdown
-    lat_items = []
-    for k, label in (("retrieval_ms", "Retrieval"), ("rerank_ms", "Reranking"),
-                     ("generation_ms", "Generation")):
-        v = md.get(k) or gen_md.get(k)
-        if v is not None:
-            lat_items.append(f"{label}: {v} ms")
-    if lat_items:
-        st.caption("⏱️ **Latency** — " + " · ".join(lat_items))
-
-
-def render_source_explorer(evidence: list) -> None:
-    """Render a compact source explorer showing unique articles and their contribution."""
-    if not evidence:
-        return
-    
-    # Group by PMID
-    by_pmid = {}
-    for ev in evidence:
-        if ev.pmid not in by_pmid:
-            by_pmid[ev.pmid] = {
-                "title": ev.title,
-                "chunks": [],
-                "entities": set(),
-                "max_score": 0,
-            }
-        by_pmid[ev.pmid]["chunks"].append(ev)
-        by_pmid[ev.pmid]["entities"].update(ev.matched_entities or [])
-        if ev.reranker_score:
-            by_pmid[ev.pmid]["max_score"] = max(by_pmid[ev.pmid]["max_score"], ev.reranker_score)
-    
-    st.subheader("📖 Source Overview", divider=False)
-    st.caption(f"{len(by_pmid)} unique articles contributed {len(evidence)} evidence items")
-    
-    # Display each source in a compact row
-    for pmid, info in sorted(by_pmid.items(), key=lambda x: x[1]["max_score"], reverse=True):
-        col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
-        with col1:
-            pubmed_url = make_pubmed_url(pmid)
-            if pubmed_url:
-                st.markdown(f"**[PMID:{pmid}](https://pubmed.ncbi.nlm.nih.gov/{pmid}/)** — {info['title'][:60]}")
-            else:
-                st.markdown(f"**PMID:{pmid}** — {info['title'][:60]}")
-        with col2:
-            st.caption(f"{len(info['chunks'])} chunks")
-        with col3:
-            entities_display = ", ".join(sorted(info['entities'])[:2])
-            if len(info['entities']) > 2:
-                entities_display += f" +{len(info['entities'])-2}"
-            st.caption(entities_display if entities_display else "—")
-        with col4:
-            if info['max_score'] > 0:
-                st.caption(f"⭐ {info['max_score']:.2f}")
-            else:
-                st.caption("—")
-
-
-def render_advanced_diagnostics(result) -> None:
-    """Render advanced diagnostics in a collapsed section."""
-    with st.expander("🔍 Advanced Diagnostics"):
-        st.subheader("Raw Metadata")
-        tab1, tab2 = st.tabs(["Retrieval", "Generation"])
-        with tab1:
-            st.json(result.retrieval_metadata or {})
-        with tab2:
-            st.json(result.generation_metadata or {})
-
-
-# ================================================================ PAGE SETUP ====
-
-st.set_page_config(
-    page_title="Scientific Literature GraphRAG",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# ================================================================ SIDEBAR ====
-
-with st.sidebar:
-    st.header("System Configuration")
-    
-    with st.expander("📊 Corpus Statistics", expanded=True):
-        st.caption("Benchmark dataset (5,000 PubMed abstracts)")
-        for k, v in CORPUS_STATS.items():
-            st.metric(k.title(), v, label_visibility="collapsed")
-    
-    st.divider()
-    
-    gen_cfg = get_cached_gen_config()
-    provider_label = ("🟢 LIVE (Groq)" if gen_cfg.provider == "groq"
-                      else "🔵 MOCK (Illustrative)")
-    
-    st.caption("**Models & Systems**")
-    st.text(f"Embedding: all-MiniLM-L6-v2")
-    st.text(f"Reranker: ms-marco-MiniLM-L-6-v2")
-    st.text(f"LLM: {provider_label}")
-    st.text(f"Model: {gen_cfg.model}")
-    
-    st.divider()
-    
-    rerank_on = st.toggle("CrossEncoder Reranking", value=True,
-                          help="Reorder top candidates using cross-encoder scoring")
-    
-    st.divider()
-    
-    if st.button("ℹ️ About This System", use_container_width=True):
-        st.session_state["show_about"] = not st.session_state.get("show_about")
-
-# ================================================================ HEADER ====
-
-st.markdown("""
-<style>
-.header-container {
-    padding: 2rem 0 1rem 0;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid #e1e4e8;
-}
-.header-title {
-    font-size: 2.5em;
-    font-weight: 700;
-    margin: 0;
-    color: #1c1f26;
-}
-.header-subtitle {
-    font-size: 1.0em;
-    color: #586069;
-    margin: 0.5rem 0 0 0;
-    font-weight: 400;
-}
-</style>
-
-<div class="header-container">
-<div class="header-title">Scientific Literature GraphRAG</div>
-<div class="header-subtitle">Evidence-grounded biomedical research assistant</div>
+def render_hero(provider_label: str, is_mock: bool):
+    pill_cls = "pill mock" if is_mock else "pill"
+    # NOTE: the accent rule uses inline styles — Streamlit's DOM handling can
+    # suppress stylesheet-only painting on this particular element.
+    st.markdown(f"""
+<div class="hero">
+  <h1>Scientific Literature<br>GraphRAG</h1>
+  <p>Evidence-grounded answers from 5,000 biomedical abstracts — hybrid
+     vector&nbsp;+&nbsp;knowledge-graph retrieval, cross-encoder reranking,
+     and validated citations.</p>
+  <div class="pill-row">
+    <span class="pill"><span class="dot"></span>Neo4j connected</span>
+    <span class="{pill_cls}"><span class="dot"></span>{provider_label}</span>
+    <span class="pill">53,091 chunks · 9,945 entities</span>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ================================================================ QUERY SECTION ====
 
-st.subheader("Search Biomedical Literature", divider=False)
+def render_answer(result) -> None:
+    st.markdown('<div class="sec-title">Answer</div>'
+                '<div class="sec-sub">Grounded in the retrieved evidence below</div>',
+                unsafe_allow_html=True)
+    if result.citation_validation and not result.citation_validation.valid:
+        st.warning("Some citations could not be verified against the evidence "
+                   "and were removed.")
+    for w in result.warnings:
+        st.warning(w)
 
-if "query_text" not in st.session_state:
-    st.session_state["query_text"] = ""
+    paras = [p for p in result.answer.split("\n") if p.strip()]
+    body = "".join(f"<p>{p}</p>" for p in paras)
+    st.markdown(f'<div class="card answer-card"><div class="answer-text">{body}</div></div>',
+                unsafe_allow_html=True)
+
+    if result.citations:
+        chips = []
+        for c in result.citations:
+            url = make_pubmed_url(c.pmid)
+            chunk = f'<span class="chunk">{c.chunk_id}</span>' if c.chunk_id else ""
+            ext = '<span class="ext">↗</span>' if url else ""
+            inner = (f'<span>PMID:{c.pmid}</span>{chunk}{ext}')
+            if url:
+                chips.append(f'<a class="cite-chip" href="{url}" target="_blank">{inner}</a>')
+            else:
+                chips.append(f'<span class="cite-chip">{inner}</span>')
+        st.markdown('<div class="cite-row">' + "".join(chips) + "</div>",
+                    unsafe_allow_html=True)
+
+    if st.button("⧉ Copy answer with citations", key="btn_copy"):
+        lines = [result.answer, "", "Citations:"]
+        for c in result.citations:
+            lines.append(f"  [PMID:{c.pmid}]"
+                         + (f" [{c.chunk_id}]" if c.chunk_id else "")
+                         + (f" {make_pubmed_url(c.pmid)}" if make_pubmed_url(c.pmid) else ""))
+        copy_to_clipboard("\n".join(lines))
+        st.toast("Answer copied to clipboard", icon="⧉")
 
 
-def set_example_query(example_text):
-    """Callback to set the query text from an example button."""
-    st.session_state["query_text"] = example_text
-
-
-# Query input with clean styling
-query = st.text_area(
-    "Your question",
-    height=90,
-    placeholder=EXAMPLES[0],
-    key="query_text",
-    label_visibility="collapsed",
-    help="Ask a specific biomedical question. Examples: mechanisms, treatments, associations."
-)
-
-# Action buttons
-col_ask, col_clear, col_space = st.columns([1, 1, 4])
-with col_ask:
-    ask = st.button("🔍 Search", type="primary", use_container_width=True)
-with col_clear:
-    if st.button("✕ Clear", use_container_width=True):
-        st.session_state["query_text"] = ""
-        st.rerun()
-
-# Example queries as research-oriented cards
-st.markdown("**Example Queries:**")
-
-examples_meta = [
-    ("factual", "Risk factors & mechanisms"),
-    ("entity-focused", "Treatments & drugs"),
-    ("multi-entity", "Cross-domain relationships"),
-]
-
-cols = st.columns(3)
-for i, ex in enumerate(EXAMPLES):
-    with cols[i]:
-        query_type, desc = examples_meta[i]
-        st.markdown(
-            f"""
-<div style='background-color: #f6f8fa; padding: 12px; border-radius: 6px; 
-            border: 1px solid #e1e4e8; margin-bottom: 0.5rem;'>
-<small><strong style="color: #0366d6;">{query_type.upper()}</strong></small><br>
-<small style="color: #666;">{desc}</small><br><br>
-<code style="font-size: 11px; color: #333;">{ex[:45]}...</code>
+def render_evidence(evidence: list) -> None:
+    st.markdown('<div class="sec-title">Supporting evidence</div>'
+                f'<div class="sec-sub">{len(evidence)} chunks from '
+                f'{len({e.pmid for e in evidence})} articles, ranked by the cross-encoder</div>',
+                unsafe_allow_html=True)
+    by_pmid: dict = {}
+    for ev in evidence:
+        by_pmid.setdefault(ev.pmid, []).append(ev)
+    for pmid, items in by_pmid.items():
+        url = make_pubmed_url(pmid)
+        head = (f'<a href="{url}" target="_blank" style="text-decoration:none;color:#B45309;">'
+                f'PMID:{pmid} ↗</a>' if url else f'PMID:{pmid}')
+        with st.expander(_shorten(items[0].title, 90), expanded=False):
+            st.markdown(f'<div class="ev-pmid">{head}</div>', unsafe_allow_html=True)
+            for ev in items:
+                rs = ev.reranker_score or 0.0
+                pct = max(0, min(100, int(rs / 8 * 100))) if rs else 0
+                pills = "".join(entity_pill(e) for e in (ev.matched_entities or []))
+                srcs = ", ".join(ev.retrieval_sources) or "—"
+                st.markdown(f"""
+<div class="ev-head">
+  <span class="ev-meta"><code>{ev.chunk_id}</code> · via {srcs}</span>
+  <span class="ev-meta">rerank <b>{rs:.2f}</b> · fused <b>{ev.fused_score:.2f}</b></span>
 </div>
-            """,
-            unsafe_allow_html=True
-        )
-        st.button(
-            f"Use Example {i + 1}",
-            use_container_width=True,
-            on_click=set_example_query,
-            args=(ex,),
-            key=f"ex_btn_{i}",
-        )
+<div class="scorebar"><div style="width:{pct}%"></div></div>
+<div class="ev-meta" style="margin-top:0.5rem;">{pills if pills else "no entities matched"}</div>
+<div class="ev-text">{ev.text}</div>
+""", unsafe_allow_html=True)
 
-# About section
-if st.session_state.get("show_about"):
-    st.divider()
-    st.subheader("About")
-    st.markdown("""
-**Architecture Overview**
 
-1. **Corpus** — 5,000 PubMed abstracts (PubMedQA-derived), fully audited and validated.
+def render_source_overview(evidence: list) -> None:
+    st.markdown('<div class="sec-title">Sources</div>'
+                '<div class="sec-sub">Unique articles behind the evidence</div>',
+                unsafe_allow_html=True)
+    by_pmid: dict = {}
+    for ev in evidence:
+        d = by_pmid.setdefault(ev.pmid, {"title": ev.title, "n": 0, "best": 0.0})
+        d["n"] += 1
+        d["best"] = max(d["best"], ev.reranker_score or 0.0)
+    rows = sorted(by_pmid.items(), key=lambda kv: -kv[1]["best"])
+    html = ['<div class="card" style="padding:0.6rem 1.2rem;">']
+    for pmid, d in rows:
+        url = make_pubmed_url(pmid)
+        link = (f'<a href="{url}" target="_blank" style="color:#B45309;font-weight:600;'
+                f'text-decoration:none;">PMID:{pmid} ↗</a>' if url else f"PMID:{pmid}")
+        html.append(
+            f'<div class="side-stat"><span>{link} — {_shorten(d["title"], 75)}</span>'
+            f"<span><b>{d['n']}</b> chunk{'s' if d['n'] != 1 else ''} · "
+            f"{d['best']:.2f}</span></div>")
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
 
-2. **Semantic Chunking** — MiniLM embeddings + HDBSCAN clustering produces 53,091 
-coherent semantic chunks with preserved boundaries.
 
-3. **Knowledge Graph** — Neo4j stores Article/Chunk/Entity nodes with MENTIONS relationships 
-and top-5 SEMANTIC_SIMILAR edges for graph-aware retrieval.
+def render_intelligence(md: dict, gen_md: dict) -> None:
+    st.markdown('<div class="sec-title">Retrieval intelligence</div>'
+                '<div class="sec-sub">How this answer was produced</div>',
+                unsafe_allow_html=True)
+    cards = [
+        ("Vector", str(md.get("n_vector", "—")), "semantic similarity"),
+        ("Entity graph", str(md.get("n_entity", "—")), "MENTIONS expansion"),
+        ("Semantic", str(md.get("n_semantic", "—")), "SIMILAR 1-hop"),
+        ("Fused", str(md.get("n_fused", "—")), "final candidates"),
+    ]
+    st.markdown('<div class="stat-grid">' + "".join(
+        f'<div class="stat"><div class="v">{v}</div><div class="k">{k}</div>'
+        f'<div style="font-size:0.72rem;color:#8A8F98;">{s}</div></div>'
+        for k, v, s in cards) + "</div>", unsafe_allow_html=True)
 
-4. **Hybrid Retrieval** — Parallel vector search and entity-aware graph expansion with 
-weighted normalization fusion for diverse evidence.
+    ents = md.get("query_entities") or []
+    cls = md.get("query_class", "—")
+    cols = st.columns([1, 2])
+    with cols[0]:
+        st.markdown(f'<div class="card"><div class="k" style="font-size:0.72rem;'
+                    f'font-weight:600;letter-spacing:0.06em;color:#8A8F98;">QUERY TYPE</div>'
+                    f'<div style="font-weight:600;margin-top:0.2rem;">{cls}</div></div>',
+                    unsafe_allow_html=True)
+    with cols[1]:
+        pills = "".join(entity_pill(e) for e in ents) or \
+            '<span style="color:#8A8F98;font-size:0.85rem;">none — vector-only retrieval</span>'
+        st.markdown(f'<div class="card"><div style="font-size:0.72rem;font-weight:600;'
+                    f'letter-spacing:0.06em;color:#8A8F98;">DETECTED ENTITIES</div>'
+                    f'<div style="margin-top:0.4rem;">{pills}</div></div>',
+                    unsafe_allow_html=True)
 
-5. **CrossEncoder Reranking** — ms-marco-MiniLM-L-6-v2 reorders top 50 candidates by 
-relevance, improving MRR from 0.87 → 0.97.
+    lat = []
+    for k, label in (("retrieval_ms", "Retrieval"), ("rerank_ms", "Rerank"),
+                     ("generation_ms", "Generation")):
+        v = md.get(k) if md.get(k) is not None else gen_md.get(k)
+        if v is not None:
+            lat.append(f"<b>{v}</b>&nbsp;ms {label.lower()}")
+    if lat:
+        st.markdown(f'<div style="font-size:0.82rem;color:#6B7078;">'
+                    f'Latency:&nbsp;{" &nbsp;·&nbsp; ".join(lat)}</div>',
+                    unsafe_allow_html=True)
 
-6. **Grounded Generation** — LLM generates answers ONLY from retrieved evidence, with 
-explicit [PMID:...] citations.
 
-7. **Citation Validation** — Every citation is checked against evidence; fabricated 
-citations are removed automatically.
-
-**Processing Pipeline**
-
-```
-Question → Classify → Hybrid Retrieval → Fusion → Rerank → Evidence Pack → LLM
-                   ↓                                            ↓
-             [Entity Expansion]              [Citation Validation]
-                                                     ↓
-                                              Answer + Citations
-```
-    """)
-
-# ================================================================ ANSWER SECTION ====
-
-if ask:
-    if not (query or "").strip():
-        st.warning("Please enter a question first.")
-        st.stop()
-    if len(query) > 2000:
-        st.warning("That question is too long (over 2,000 characters). Please shorten it.")
-        st.stop()
-    
-    try:
-        with st.spinner("🔄 Preparing query…"):
-            pass
-        with st.spinner("📚 Retrieving evidence from literature…"):
-            pass
-        with st.spinner("✨ Generating grounded answer…"):
-            result, gen = ask_pipeline(query.strip(), rerank_on)
-    except RetrievalError as exc:
-        st.error(
-            "❌ **Database Connection Error**\n\n"
-            "Could not reach the Neo4j literature database. "
-            "Ensure Neo4j is running: `docker-compose up neo4j` (see README).\n\n"
-            "Then refresh this page and try again."
-        )
-        log.error("retrieval failed: %s", traceback.format_exc())
-        st.stop()
-    except Exception:  # noqa: BLE001
-        st.error(
-            "❌ **Processing Error**\n\n"
-            "An unexpected error occurred. Check the application logs for details."
-        )
-        log.error("pipeline failed: %s", traceback.format_exc())
-        st.stop()
-    
-    # ---- Answer Display ----
-    render_answer_section(result)
-    
-    # ---- Evidence ----
-    st.divider()
-    st.subheader("📚 Supporting Evidence")
-    st.caption(f"Retrieved {len(result.evidence)} evidence items from {len(set(e.pmid for e in result.evidence))} articles")
-    render_evidence_cards(result.evidence)
-    
-    # ---- Source Overview ----
-    st.divider()
-    render_source_explorer(result.evidence)
-    
-    # ---- Retrieval Intelligence ----
-    st.divider()
-    st.subheader("🧠 Retrieval Intelligence")
-    st.caption("How the search and ranking process worked")
-    render_retrieval_intelligence(result.retrieval_metadata or {}, result.generation_metadata or {})
-    
-    # ---- Evidence Graph ----
-    st.divider()
-    st.subheader("🔗 Evidence Graph")
+def render_graph_section(result, gen) -> None:
+    st.markdown('<div class="sec-title">Evidence graph</div>'
+                '<div class="sec-sub">Query entities → evidence chunks → similar chunks</div>',
+                unsafe_allow_html=True)
     try:
         md = result.retrieval_metadata or {}
         graph = build_evidence_graph(
             gen.retriever._run, md.get("query_entities") or [], result.evidence)
         try:
             html = render_pyvis_html(graph)
-            components.html(html, height=500)
+            st.markdown('<div class="card" style="padding:0.5rem;">', unsafe_allow_html=True)
+            components.html(html, height=460)
+            st.markdown("</div>", unsafe_allow_html=True)
         except Exception:
-            st.info("Interactive visualization unavailable. Showing relationship table instead.")
+            st.info("Interactive graph unavailable — relationships as a table:")
             st.table(graph.get("edges", []))
         if graph.get("truncated"):
-            st.caption("⚠️ Graph truncated to 60 nodes for readability.")
+            st.caption("Graph truncated to 60 nodes for readability.")
     except Exception:  # noqa: BLE001
-        st.info("Could not build evidence graph for this query. "
-                "This may occur for queries with few entities or limited evidence connections.")
-    
-    # ---- New Search ----
-    st.divider()
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        if st.button("🔄 New Search", use_container_width=True, key="btn_new_search"):
-            st.session_state["query_text"] = ""
-            st.rerun()
-    with col2:
-        if st.button("📋 Copy Answer", use_container_width=True, key="btn_copy_main"):
-            pass  # Note: Real copy would use clipboard JS
-    
-    # ---- Advanced Diagnostics ----
-    render_advanced_diagnostics(result)
+        st.info("Could not build the evidence graph for this query.")
+
+
+def render_diagnostics(result) -> None:
+    with st.expander("Advanced diagnostics"):
+        t1, t2 = st.tabs(["Retrieval", "Generation"])
+        with t1:
+            st.json(result.retrieval_metadata or {})
+        with t2:
+            st.json(result.generation_metadata or {})
+
+
+def render_about():
+    st.markdown('<div class="sec-title">About this system</div>', unsafe_allow_html=True)
+    st.markdown("""
+<div class="card">
+
+**1. Corpus** — 5,000 PubMed abstracts (PubMedQA-derived), fully audited.
+
+**2. Semantic chunking** — MiniLM embeddings + HDBSCAN clustering → 53,091 coherent chunks.
+
+**3. Knowledge graph** — Neo4j: Article / Chunk / Entity nodes, `MENTIONS` and top-5
+`SEMANTIC_SIMILAR` edges.
+
+**4. Hybrid retrieval** — vector search + entity-aware graph expansion, weighted fusion.
+
+**5. CrossEncoder reranking** — `ms-marco-MiniLM-L-6-v2` reorders the top-50 candidates
+(measured: MRR 0.86 → 0.97 on 200 PubMedQA questions).
+
+**6. Grounded generation** — the LLM answers *only* from retrieved evidence with
+`[PMID:…]` citations, and declines when evidence is insufficient.
+
+**7. Citation validation** — every citation is checked against the evidence;
+fabricated citations trigger one stricter regeneration, then removal with a warning.
+
+```
+query → classify → hybrid retrieval → fusion → rerank
+      → evidence pack → LLM → citation validation → answer
+```
+</div>
+""", unsafe_allow_html=True)
+
+
+def _set_query(text: str):
+    """Callback: runs before the script body, so the widget key may be set."""
+    st.session_state["query_text"] = text
+
+
+def _toggle_about():
+    st.session_state["show_about"] = not st.session_state.get("show_about")
+
+
+# ============================================================ PAGE ====
+
+st.set_page_config(page_title="Scientific Literature GraphRAG", layout="wide")
+inject_css()
+
+# ---- sidebar ----
+with st.sidebar:
+    st.markdown("### System")
+    gen_cfg = get_cached_gen_config()
+    is_mock = gen_cfg.provider != "groq"
+    stats_html = "".join(
+        f'<div class="side-stat"><span>{k}</span><b>{v}</b></div>'
+        for k, v in CORPUS_STATS)
+    st.markdown(stats_html, unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("**Models**")
+    st.caption(f"Embedding · `all-MiniLM-L6-v2`")
+    st.caption(f"Reranker · `ms-marco-MiniLM-L-6-v2`")
+    st.caption(f"LLM · `{'mock (illustrative)' if is_mock else gen_cfg.model}`")
+    st.markdown("---")
+    rerank_on = st.toggle("CrossEncoder reranking", value=True,
+                          help="Reorder top candidates with the cross-encoder")
+    st.markdown("---")
+    st.button("About this system", use_container_width=True,
+              on_click=_toggle_about)
+
+# ---- hero ----
+render_hero("Mock LLM · illustrative answers" if is_mock else f"Groq · {gen_cfg.model}",
+            is_mock)
+
+# ---- query ----
+if "query_text" not in st.session_state:
+    st.session_state["query_text"] = ""
+st.text_area("Your question", height=96, key="query_text",
+             placeholder="Ask about mechanisms, treatments, associations…",
+             label_visibility="collapsed")
+
+c1, c2, _ = st.columns([1.6, 1, 4.4])
+with c1:
+    ask = st.button("Search literature", type="primary", use_container_width=True)
+with c2:
+    st.button("Clear", use_container_width=True, on_click=_set_query, args=("",))
+
+st.markdown('<div class="sec-sub" style="margin-top:1.25rem;">Try an example</div>',
+            unsafe_allow_html=True)
+cols = st.columns(3)
+for i, (tag, ex) in enumerate(EXAMPLES):
+    with cols[i]:
+        st.markdown(f'<div class="ex-card"><div class="ex-tag">{tag}</div>'
+                    f'<div class="ex-q">{ex}</div></div>', unsafe_allow_html=True)
+        st.button("Use this question", key=f"ex_{i}", use_container_width=True,
+                  on_click=_set_query, args=(ex,))
+
+if st.session_state.get("show_about"):
+    render_about()
+
+# ---- answer flow ----
+if ask:
+    query = (st.session_state.get("query_text") or "").strip()
+    if not query:
+        st.warning("Please enter a question first.")
+        st.stop()
+    if len(query) > 2000:
+        st.warning("That question is too long (over 2,000 characters). Please shorten it.")
+        st.stop()
+    try:
+        with st.status("Working through the literature…", expanded=True) as status:
+            status.write("Classifying query and retrieving evidence…")
+            result, gen = ask_pipeline(query, rerank_on)
+            status.write("Validating citations…")
+            status.update(label="Done", state="complete", expanded=False)
+    except RetrievalError:
+        st.error("**Database unreachable.** Start Neo4j (`bin/neo4j start`), "
+                 "check `SGRAG_NEO4J_PASSWORD`, then retry.")
+        log.error("retrieval failed:\n%s", traceback.format_exc())
+        st.stop()
+    except Exception:  # noqa: BLE001
+        st.error("Something went wrong while answering. Details are in the app log.")
+        log.error("pipeline failed:\n%s", traceback.format_exc())
+        st.stop()
+
+    # The generator degrades gracefully: a retrieval failure comes back as a
+    # result carrying a "retrieval error:" warning (not a raised exception).
+    # Present that as a clean, actionable error instead of raw socket details.
+    retrieval_failed = any(
+        str(w).startswith("retrieval error:") for w in result.warnings)
+
+    if retrieval_failed:
+        st.error("**Database unreachable.** The literature database (Neo4j) "
+                 "could not be reached.\n\n"
+                 "Start Neo4j (`bin/neo4j start`), check `SGRAG_NEO4J_PASSWORD`, "
+                 "then try again.")
+    else:
+        render_answer(result)
+        if result.evidence:
+            render_evidence(result.evidence)
+            render_source_overview(result.evidence)
+        render_intelligence(result.retrieval_metadata or {},
+                            result.generation_metadata or {})
+        if result.evidence:
+            render_graph_section(result, gen)
+        render_diagnostics(result)
+
+    st.button("↺ New search", key="btn_new", on_click=_set_query, args=("",))
+
+st.markdown('<div class="footer">Scientific Literature GraphRAG · evidence-grounded '
+            "biomedical QA · Neo4j + MiniLM + CrossEncoder</div>",
+            unsafe_allow_html=True)
