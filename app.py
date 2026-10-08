@@ -37,12 +37,7 @@ EXAMPLES = [
      "How does inflammation affect cardiovascular disease?"),
 ]
 
-CORPUS_STATS = [
-    ("Articles", "5,000"),
-    ("Chunks", "53,091"),
-    ("Entities", "9,945"),
-    ("Semantic edges", "265,455"),
-]
+STAT_LABELS = ("Articles", "Chunks", "Entities", "Semantic edges")
 
 # ============================================================ THEME SYSTEM ====
 # Centralized palettes. Every theme intentionally defines all UI colors so
@@ -513,6 +508,44 @@ def get_generator(rerank_enabled: bool) -> GroundedGenerator:
                              retriever=HybridRetriever(cfg))
 
 
+@st.cache_resource(show_spinner=False, ttl=300)
+def get_graph_stats() -> dict | None:
+    """Live corpus counts from Neo4j; None when the database is unreachable.
+
+    Uses the project's existing retrieval configuration
+    (configs/retrieval.yaml + SGRAG_NEO4J_* env) — the same connection the
+    retriever itself uses — without initializing the heavyweight retrieval
+    pipeline (no embedding/reranker model loads). Results are cached for
+    5 minutes so the sidebar doesn't hit the database on every rerun.
+    """
+    from neo4j import GraphDatabase
+
+    from sgrag.retrieval.config import load_retrieval_config
+
+    try:
+        cfg = load_retrieval_config("configs/retrieval.yaml")
+        driver = GraphDatabase.driver(
+            cfg.neo4j_uri, auth=(cfg.neo4j_user, cfg.neo4j_password))
+        driver.verify_connectivity()
+        with driver.session(database=cfg.neo4j_database) as session:
+            def _count(cypher: str) -> int:
+                rec = session.run(cypher).single()
+                return int(rec["n"]) if rec else 0
+
+            stats = {
+                "Articles": _count("MATCH (a:Article) RETURN count(a) AS n"),
+                "Chunks": _count("MATCH (c:Chunk) RETURN count(c) AS n"),
+                "Entities": _count("MATCH (e:Entity) RETURN count(e) AS n"),
+                "Semantic edges": _count(
+                    "MATCH ()-[r:SEMANTIC_SIMILAR]->() RETURN count(r) AS n"),
+            }
+        driver.close()
+        return stats
+    except Exception:  # noqa: BLE001 - any failure means "stats unavailable"
+        log.warning("live graph stats unavailable", exc_info=True)
+        return None
+
+
 @st.cache_resource(show_spinner=False)
 def get_cached_gen_config():
     return load_generation_config()
@@ -563,8 +596,15 @@ def copy_to_clipboard(text: str):
 
 # ============================================================ RENDER ====
 
-def render_hero(provider_label: str, is_mock: bool):
+def render_hero(provider_label: str, is_mock: bool, neo4j_ok: bool,
+                corpus_label: str | None):
     pill_cls = "pill mock" if is_mock else "pill"
+    neo4j_pill = ('<span class="pill"><span class="dot"></span>Neo4j connected</span>'
+                 if neo4j_ok else
+                 '<span class="pill mock"><span class="dot"></span>Neo4j unreachable</span>')
+    corpus_pill = (f'<span class="pill">{corpus_label}</span>'
+                   if corpus_label else
+                   '<span class="pill">corpus stats unavailable</span>')
     # NOTE: the accent rule uses inline styles — Streamlit's DOM handling can
     # suppress stylesheet-only painting on this particular element.
     st.markdown(f"""
@@ -574,9 +614,9 @@ def render_hero(provider_label: str, is_mock: bool):
      vector&nbsp;+&nbsp;knowledge-graph retrieval, cross-encoder reranking,
      and validated citations.</p>
   <div class="pill-row">
-    <span class="pill"><span class="dot"></span>Neo4j connected</span>
+    {neo4j_pill}
     <span class="{pill_cls}"><span class="dot"></span>{provider_label}</span>
-    <span class="pill">53,091 chunks · 9,945 entities</span>
+    {corpus_pill}
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -801,12 +841,21 @@ inject_css(theme_name)
 # ---- sidebar ----
 with st.sidebar:
     st.markdown("### System")
+    graph_stats = get_graph_stats()
+    if graph_stats is not None:
+        stats_html = "".join(
+            f'<div class="side-stat"><span>{k}</span><b>{v:,}</b></div>'
+            for k, v in graph_stats.items())
+    else:
+        # Honest fallback: em-dashes instead of stale hard-coded numbers.
+        stats_html = "".join(
+            f'<div class="side-stat"><span>{k}</span><b>—</b></div>'
+            for k in STAT_LABELS)
+    st.markdown(stats_html, unsafe_allow_html=True)
+    if graph_stats is None:
+        st.caption("Live stats unavailable — Neo4j unreachable.")
     gen_cfg = get_cached_gen_config()
     is_mock = gen_cfg.provider != "groq"
-    stats_html = "".join(
-        f'<div class="side-stat"><span>{k}</span><b>{v}</b></div>'
-        for k, v in CORPUS_STATS)
-    st.markdown(stats_html, unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("**Models**")
     st.caption(f"Embedding · `all-MiniLM-L6-v2`")
@@ -822,8 +871,12 @@ with st.sidebar:
               on_click=_toggle_about)
 
 # ---- hero ----
+_corpus_label = (f"{graph_stats['Chunks']:,} chunks · "
+                 f"{graph_stats['Entities']:,} entities"
+                 if graph_stats is not None else None)
 render_hero("Mock LLM · illustrative answers" if is_mock else f"Groq · {gen_cfg.model}",
-            is_mock)
+            is_mock, neo4j_ok=graph_stats is not None,
+            corpus_label=_corpus_label)
 
 # ---- query ----
 if "query_text" not in st.session_state:
