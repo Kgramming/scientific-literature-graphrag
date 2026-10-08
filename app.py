@@ -71,12 +71,12 @@ THEMES: dict[str, dict[str, str]] = {
     "Dark / Midnight": {
         "page_bg": "#0E131E", "sidebar_bg": "#141A27", "sidebar_border": "#232C40",
         "card_bg": "#18202F", "card_border": "#2A3549",
-        "heading": "#F0F3F9", "text": "#D7DDE8", "muted": "#98A2B6", "faint": "#6B7488",
+        "heading": "#F0F3F9", "text": "#D7DDE8", "muted": "#98A2B6", "faint": "#8B95A9",
         "accent": "#E8A33D", "accent_hover": "#F2B45C", "on_accent": "#201503",
         "accent_soft": "#2A2113", "link": "#8FB8E8",
         "btn_sec_bg": "#1E2635", "btn_sec_text": "#E6EAF2", "btn_sec_border": "#33405A",
         "input_bg": "#141A27", "input_border": "#33405A", "input_text": "#EDEFF5",
-        "placeholder": "#6B7488",
+        "placeholder": "#8B95A9",
         "chip_bg": "#2E4A73", "chip_text": "#EDF2FA",
         "pill_border": "#2A3549", "pill_text": "#C2CAD8",
         "score_track": "#232C40", "score_fill1": "#E8A33D", "score_fill2": "#F2B45C",
@@ -92,12 +92,12 @@ THEMES: dict[str, dict[str, str]] = {
     "Dracula": {
         "page_bg": "#282A36", "sidebar_bg": "#21222C", "sidebar_border": "#44475A",
         "card_bg": "#343642", "card_border": "#44475A",
-        "heading": "#F8F8F2", "text": "#E8E8E2", "muted": "#9DA0B0", "faint": "#767A8F",
+        "heading": "#F8F8F2", "text": "#E8E8E2", "muted": "#9DA0B0", "faint": "#9BA0B5",
         "accent": "#BD93F9", "accent_hover": "#D0AEFB", "on_accent": "#282A36",
         "accent_soft": "#3D3A52", "link": "#8BE9FD",
         "btn_sec_bg": "#343642", "btn_sec_text": "#F8F8F2", "btn_sec_border": "#6272A4",
         "input_bg": "#21222C", "input_border": "#6272A4", "input_text": "#F8F8F2",
-        "placeholder": "#767A8F",
+        "placeholder": "#9BA0B5",
         "chip_bg": "#4A3F6B", "chip_text": "#F8F8F2",
         "pill_border": "#44475A", "pill_text": "#D8D8D2",
         "score_track": "#44475A", "score_fill1": "#BD93F9", "score_fill2": "#FF79C6",
@@ -113,12 +113,12 @@ THEMES: dict[str, dict[str, str]] = {
     "Nord": {
         "page_bg": "#2E3440", "sidebar_bg": "#272C36", "sidebar_border": "#434C5E",
         "card_bg": "#3B4252", "card_border": "#4C566A",
-        "heading": "#ECEFF4", "text": "#D8DEE9", "muted": "#9BA3B4", "faint": "#6E7687",
+        "heading": "#ECEFF4", "text": "#D8DEE9", "muted": "#AEB6C6", "faint": "#A8B0C2",
         "accent": "#88C0D0", "accent_hover": "#9BD0DE", "on_accent": "#2E3440",
         "accent_soft": "#36414F", "link": "#81A1C1",
         "btn_sec_bg": "#3B4252", "btn_sec_text": "#ECEFF4", "btn_sec_border": "#4C566A",
         "input_bg": "#272C36", "input_border": "#4C566A", "input_text": "#ECEFF4",
-        "placeholder": "#6E7687",
+        "placeholder": "#A8B0C2",
         "chip_bg": "#434C5E", "chip_text": "#ECEFF4",
         "pill_border": "#4C566A", "pill_text": "#C9D1DF",
         "score_track": "#434C5E", "score_fill1": "#88C0D0", "score_fill2": "#8FBCBB",
@@ -134,12 +134,12 @@ THEMES: dict[str, dict[str, str]] = {
     "One Dark": {
         "page_bg": "#282C34", "sidebar_bg": "#21252B", "sidebar_border": "#3E4451",
         "card_bg": "#2E333D", "card_border": "#3E4451",
-        "heading": "#E8EAEF", "text": "#ABB2BF", "muted": "#8B909B", "faint": "#636D83",
+        "heading": "#E8EAEF", "text": "#ABB2BF", "muted": "#A0A6B1", "faint": "#9AA2B4",
         "accent": "#61AFEF", "accent_hover": "#7DBBF2", "on_accent": "#1B1E24",
         "accent_soft": "#2C3644", "link": "#7DBBF2",
         "btn_sec_bg": "#2E333D", "btn_sec_text": "#E8EAEF", "btn_sec_border": "#4A5160",
         "input_bg": "#21252B", "input_border": "#4A5160", "input_text": "#E8EAEF",
-        "placeholder": "#636D83",
+        "placeholder": "#9AA2B4",
         "chip_bg": "#3E4451", "chip_text": "#E8EAEF",
         "pill_border": "#3E4451", "pill_text": "#C3C9D4",
         "score_track": "#3E4451", "score_fill1": "#61AFEF", "score_fill2": "#56B6C2",
@@ -155,12 +155,12 @@ THEMES: dict[str, dict[str, str]] = {
     "Gruvbox": {
         "page_bg": "#282828", "sidebar_bg": "#232323", "sidebar_border": "#504945",
         "card_bg": "#32302F", "card_border": "#504945",
-        "heading": "#FBF1C7", "text": "#EBDBB2", "muted": "#A89A82", "faint": "#7C6F64",
+        "heading": "#FBF1C7", "text": "#EBDBB2", "muted": "#A89A82", "faint": "#A39684",
         "accent": "#FE8019", "accent_hover": "#FF9A3C", "on_accent": "#282828",
         "accent_soft": "#3D3226", "link": "#83A598",
         "btn_sec_bg": "#32302F", "btn_sec_text": "#FBF1C7", "btn_sec_border": "#665C54",
         "input_bg": "#232323", "input_border": "#665C54", "input_text": "#FBF1C7",
-        "placeholder": "#7C6F64",
+        "placeholder": "#A39684",
         "chip_bg": "#504945", "chip_text": "#FBF1C7",
         "pill_border": "#504945", "pill_text": "#D5C4A1",
         "score_track": "#504945", "score_fill1": "#FE8019", "score_fill2": "#FABD2F",
@@ -176,15 +176,15 @@ THEMES: dict[str, dict[str, str]] = {
     "Solarized Dark": {
         "page_bg": "#002B36", "sidebar_bg": "#073642", "sidebar_border": "#1A4E5E",
         "card_bg": "#0B3842", "card_border": "#1D5566",
-        "heading": "#FDF6E3", "text": "#B0BEC0", "muted": "#839496", "faint": "#5E7A82",
-        "accent": "#268BD2", "accent_hover": "#4AA3E0", "on_accent": "#FDF6E3",
+        "heading": "#FDF6E3", "text": "#B0BEC0", "muted": "#93A5A8", "faint": "#8DA3AB",
+        "accent": "#1E7AB8", "accent_hover": "#2E96D8", "on_accent": "#FFFFFF",
         "accent_soft": "#0E3A4A", "link": "#2AA198",
         "btn_sec_bg": "#0B3842", "btn_sec_text": "#FDF6E3", "btn_sec_border": "#2A6B7E",
         "input_bg": "#073642", "input_border": "#2A6B7E", "input_text": "#FDF6E3",
-        "placeholder": "#5E7A82",
+        "placeholder": "#8DA3AB",
         "chip_bg": "#155066", "chip_text": "#FDF6E3",
         "pill_border": "#1D5566", "pill_text": "#B0BEC0",
-        "score_track": "#0E4A5A", "score_fill1": "#268BD2", "score_fill2": "#2AA198",
+        "score_track": "#0E4A5A", "score_fill1": "#1E7AB8", "score_fill2": "#2AA198",
         "code_text": "#B58900", "code_bg": "#073642",
         "err_bg": "#3D1F1F", "err_border": "#7A2E2E", "err_text": "#E08A8A",
         "warn_bg": "#3D3218", "warn_border": "#7A6220", "warn_text": "#D9B44A",
@@ -197,12 +197,12 @@ THEMES: dict[str, dict[str, str]] = {
     "Catppuccin Mocha": {
         "page_bg": "#1E1E2E", "sidebar_bg": "#181825", "sidebar_border": "#313244",
         "card_bg": "#262638", "card_border": "#45475A",
-        "heading": "#E8ECF8", "text": "#CDD6F4", "muted": "#A6ADC8", "faint": "#6C7086",
+        "heading": "#E8ECF8", "text": "#CDD6F4", "muted": "#A6ADC8", "faint": "#8E95AC",
         "accent": "#FAB387", "accent_hover": "#FBC89D", "on_accent": "#1E1E2E",
         "accent_soft": "#3A2E22", "link": "#89B4FA",
         "btn_sec_bg": "#262638", "btn_sec_text": "#E8ECF8", "btn_sec_border": "#585B70",
         "input_bg": "#181825", "input_border": "#585B70", "input_text": "#E8ECF8",
-        "placeholder": "#6C7086",
+        "placeholder": "#8E95AC",
         "chip_bg": "#45475A", "chip_text": "#E8ECF8",
         "pill_border": "#45475A", "pill_text": "#BAC2DE",
         "score_track": "#313244", "score_fill1": "#FAB387", "score_fill2": "#F5C2E7",
@@ -269,7 +269,7 @@ hr { border-color: var(--th-card-border); }
     font-weight: 700; font-size: 2.6rem; line-height: 1.15;
     color: var(--th-heading); margin: 0;
 }
-.stMarkdown .hero p {
+[data-testid="stMarkdownContainer"] .hero p {
     font-size: 1.02rem; color: var(--th-muted); margin: 0.6rem 0 0 0; max-width: 640px;
 }
 .pill-row { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
@@ -414,24 +414,48 @@ div[data-testid="stTextArea"] textarea:focus {
     border-color: var(--th-accent); box-shadow: 0 0 0 1px var(--th-accent);
     outline: none;
 }
-div[data-testid="stSelectbox"] [role="combobox"] {
+/* selectbox: the visible control is div[role="group"] containing
+   input[role="combobox"] (value) and the arrow button */
+div[data-testid="stSelectbox"] div[role="group"] {
     background: var(--th-input-bg); border: 1px solid var(--th-input-border);
     border-radius: 10px;
 }
-div[data-testid="stSelectbox"] [role="combobox"] > div {
-    background: transparent;
-}
-div[data-testid="stSelectbox"] [role="combobox"] input,
-div[data-testid="stSelectbox"] [role="combobox"] span {
-    color: var(--th-input-text);
-}
-div[data-testid="stSelectbox"] [role="combobox"]:focus-within {
+div[data-testid="stSelectbox"] div[role="group"]:focus-within {
     border-color: var(--th-accent); box-shadow: 0 0 0 1px var(--th-accent);
 }
-div[data-testid="stWidgetLabel"] label p, div[data-testid="stWidgetLabel"] p {
+div[data-testid="stSelectbox"] input[role="combobox"] {
+    background: transparent; color: var(--th-input-text);
+}
+div[data-testid="stSelectbox"] div[role="group"] button {
+    background: transparent; border: none; color: var(--th-muted);
+}
+div[data-testid="stSelectbox"] div[role="group"] button:hover {
+    color: var(--th-accent); background: transparent;
+}
+div[data-testid="stSelectbox"] div[role="group"] button svg {
+    color: var(--th-muted);
+}
+/* dropdown menu (rendered in a body-level portal) */
+div[role="listbox"] {
+    background: var(--th-card-bg); border: 1px solid var(--th-card-border);
+    border-radius: 10px; overflow: hidden;
+}
+div[role="option"] { color: var(--th-text); background: transparent; }
+div[role="option"]:hover { background: var(--th-accent-soft); color: var(--th-heading); }
+div[role="option"][aria-selected="true"] {
+    background: var(--th-accent-soft); color: var(--th-accent);
+    font-weight: 600;
+}
+/* widget labels: selectbox uses label > ... > p, toggle uses
+   div[data-testid="stWidgetLabel"] > ... > p (no label element) */
+div[data-testid="stSelectbox"] label p,
+div[data-testid="stWidgetLabel"] p {
     color: var(--th-text);
 }
 div[data-testid="stToggle"] label { color: var(--th-text); }
+/* help / tooltip icons */
+span[data-testid="stTooltipHoverTarget"] { color: var(--th-muted); }
+span[data-testid="stTooltipHoverTarget"]:hover { color: var(--th-accent); }
 div[data-testid="stExpander"] {
     background: var(--th-card-bg); border: 1px solid var(--th-card-border);
     border-radius: 12px;
@@ -462,11 +486,14 @@ div[data-testid="stStatusWidget"] p { color: var(--th-text); }
 div[data-testid="stCaptionContainer"], div[data-testid="stCaptionContainer"] p {
     color: var(--th-muted);
 }
-.stMarkdown a { color: var(--th-link); }
-.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: var(--th-heading); }
-.stMarkdown p, .stMarkdown li { color: var(--th-text); }
-.stMarkdown strong { color: var(--th-heading); }
-.stMarkdown code, [data-testid="stCaptionContainer"] code,
+[data-testid="stMarkdownContainer"] a { color: var(--th-link); }
+[data-testid="stMarkdownContainer"] h1,
+[data-testid="stMarkdownContainer"] h2,
+[data-testid="stMarkdownContainer"] h3 { color: var(--th-heading); }
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li { color: var(--th-text); }
+[data-testid="stMarkdownContainer"] strong { color: var(--th-heading); }
+[data-testid="stMarkdownContainer"] code, [data-testid="stCaptionContainer"] code,
 section[data-testid="stSidebar"] code {
     color: var(--th-code-text); background: var(--th-code-bg);
     border-radius: 4px; padding: 0.1em 0.35em;
