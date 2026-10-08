@@ -6,7 +6,12 @@ a hybrid vector + graph retrieval pipeline with cross-encoder and graph-aware re
 grounded LLM that answers with validated citations. Every architectural choice is measured through
 ablation experiments on a deterministically constructed PubMedQA evaluation set.
 
-**Status:** planning phase (Phase 0). Architecture, roadmap, and experiment plan are in `docs/`.
+**Status:** complete demo-ready product. Phase 3B knowledge graph (Neo4j),
+Phase 4 hybrid retrieval, Phase 5A CrossEncoder reranking + measured
+evaluation (Recall@5 0.9850, MRR 0.9689 on 200 PubMedQA questions), Phase 5B
+evidence-grounded generation with citation validation, Phase 5C query
+classification/decomposition, Phase 5D Streamlit app (`app.py`),
+`scripts/ask.py` CLI. See `docs/DEMO_GUIDE.md` to run the demo.
 No superiority claim is made until experiments demonstrate it.
 
 ## Research questions
