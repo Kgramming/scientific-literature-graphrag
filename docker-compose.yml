@@ -3,7 +3,7 @@
 # NOTE: pin the exact image tag after the first successful pull in Phase 0.
 services:
   neo4j:
-    image: neo4j:5
+    image: neo4j:5.26.0
     container_name: sgrag-neo4j
     restart: unless-stopped
     ports:
