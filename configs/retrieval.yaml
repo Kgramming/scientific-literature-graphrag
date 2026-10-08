@@ -32,3 +32,10 @@ fusion:
   weight_entity: 0.25
   weight_semantic: 0.15
   rrf_k: 60
+
+reranker:
+  enabled: false        # default: Phase 4 fused ranking (backward compatible)
+  model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  candidate_k: 50        # bounded pool reranked; the 53k corpus is never reranked
+  batch_size: 32
+  fallback_to_fusion: true

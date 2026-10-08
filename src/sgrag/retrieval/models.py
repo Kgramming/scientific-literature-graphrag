@@ -19,9 +19,14 @@ class RetrievalResult:
     semantic_score: float | None = None  # max SEMANTIC_SIMILAR edge score
     semantic_rank: int | None = None
     fused_score: float = 0.0
-    rank: int = 0                      # final 1-based rank
+    rank: int = 0                      # fused rank (1-based)
     retrieval_sources: list[str] = field(default_factory=list)
     matched_entities: list[str] = field(default_factory=list)
+    # Phase 5A reranking (None when the reranker is disabled or not applied)
+    reranker_score: float | None = None
+    reranker_rank: int | None = None
+    final_score: float | None = None   # = reranker_score when reranked
+    final_rank: int | None = None      # final 1-based rank after reranking
 
     def to_dict(self) -> dict:
         return asdict(self)

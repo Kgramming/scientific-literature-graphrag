@@ -15,6 +15,15 @@ import yaml
 
 
 @dataclass(frozen=True)
+class RerankerConfig:
+    enabled: bool = False          # backward-compatible default: Phase 4 only
+    model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    candidate_k: int = 50          # bounded pool reranked (never the 53k corpus)
+    batch_size: int = 32
+    fallback_to_fusion: bool = True  # on reranker failure keep fused ranking
+
+
+@dataclass(frozen=True)
 class FusionConfig:
     method: str = "weighted"  # "weighted" | "rrf"
     weight_vector: float = 0.6
@@ -43,12 +52,14 @@ class RetrievalConfig:
     neo4j_password: str = ""
     neo4j_database: str = "neo4j"
     fusion: FusionConfig = field(default_factory=FusionConfig)
+    reranker: RerankerConfig = field(default_factory=RerankerConfig)
 
 
 def load_retrieval_config(path: str | Path) -> RetrievalConfig:
     with open(path, encoding="utf-8") as fh:
         raw = yaml.safe_load(fh) or {}
     fusion_raw = raw.get("fusion", {})
+    rerank_raw = raw.get("reranker", {})
     neo4j_raw = raw.get("neo4j", {})
     cfg = RetrievalConfig(
         vector_top_k=int(raw.get("vector_top_k", 20)),
@@ -71,6 +82,13 @@ def load_retrieval_config(path: str | Path) -> RetrievalConfig:
             weight_entity=float(fusion_raw.get("weight_entity", 0.25)),
             weight_semantic=float(fusion_raw.get("weight_semantic", 0.15)),
             rrf_k=int(fusion_raw.get("rrf_k", 60)),
+        ),
+        reranker=RerankerConfig(
+            enabled=bool(rerank_raw.get("enabled", False)),
+            model=rerank_raw.get("model", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
+            candidate_k=int(rerank_raw.get("candidate_k", 50)),
+            batch_size=int(rerank_raw.get("batch_size", 32)),
+            fallback_to_fusion=bool(rerank_raw.get("fallback_to_fusion", True)),
         ),
     )
     validate_retrieval_config(cfg)
@@ -97,3 +115,7 @@ def validate_retrieval_config(cfg: RetrievalConfig) -> None:
         raise ValueError(f"fusion weights must sum to 1.0, got {w}")
     if cfg.fusion.rrf_k < 1:
         raise ValueError("fusion.rrf_k must be >= 1")
+    if cfg.reranker.candidate_k < 1:
+        raise ValueError("reranker.candidate_k must be >= 1")
+    if cfg.reranker.batch_size < 1:
+        raise ValueError("reranker.batch_size must be >= 1")

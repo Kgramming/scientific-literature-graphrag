@@ -24,7 +24,12 @@ from sgrag.retrieval.config import RetrievalConfig, load_retrieval_config
 from sgrag.retrieval.fusion import fuse_candidates
 from sgrag.retrieval.models import RetrievalResult
 from sgrag.retrieval.query import embed_query, extract_query_entities
-from sgrag.retrieval.rerank import NoOpReranker, Reranker
+from sgrag.retrieval.rerank import (
+    CrossEncoderReranker,
+    NoOpReranker,
+    Reranker,
+    RerankerError,
+)
 
 TITLE_LOOKUP = """
 UNWIND $pmids AS pmid
@@ -49,7 +54,17 @@ class HybridRetriever:
         )
         self._driver = driver
         self._owns_driver = driver is None
-        self.reranker: Reranker = reranker or NoOpReranker()
+        # Reranker selection: explicit instance wins; otherwise the config
+        # decides. Default is the Phase 4 pass-through (backward compatible).
+        if reranker is not None:
+            self.reranker: Reranker = reranker
+        elif self.config.reranker.enabled:
+            rc = self.config.reranker
+            self.reranker = CrossEncoderReranker(
+                model=rc.model, candidate_k=rc.candidate_k,
+                batch_size=rc.batch_size)
+        else:
+            self.reranker = NoOpReranker()
 
     # -- connection -----------------------------------------------------
     def _connect(self) -> Driver:
@@ -153,10 +168,26 @@ class HybridRetriever:
             for r in results:
                 r.title = titles.get(r.pmid, "")
 
-        # 7. optional reranker (Phase 5; default pass-through)
-        results = self.reranker.rerank(query, results)
+        # 7. optional reranker (Phase 5A; default pass-through)
+        t = time.perf_counter()
+        diag["reranker"] = self.reranker.name
+        try:
+            results = self.reranker.rerank(query, results)
+        except RerankerError as exc:
+            if self.config.reranker.fallback_to_fusion:
+                print(f"[rerank] {exc} -- falling back to fused ranking")
+                results = NoOpReranker().rerank(query, results)
+                diag["reranker_fallback"] = True
+            else:
+                raise RetrievalError(f"reranker failed: {exc}") from exc
+        diag["rerank_ms"] = round((time.perf_counter() - t) * 1000, 1)
         for rank, r in enumerate(results, start=1):
             r.rank = rank
+            # final_* mirrors the reranked order; without a reranker the
+            # fused ranking stands as final.
+            if r.final_rank is None:
+                r.final_rank = rank
+                r.final_score = r.fused_score
 
         diag["total_ms"] = round((time.perf_counter() - t0) * 1000, 1)
         return results, diag
