@@ -849,6 +849,13 @@ def _set_query(text: str):
     st.session_state["query_text"] = text
 
 
+def _clear_search():
+    """Callback: reset to the initial state (no query text, no results)."""
+    st.session_state["query_text"] = ""
+    st.session_state.pop("last_result", None)
+    st.session_state.pop("last_gen", None)
+
+
 def _toggle_about():
     st.session_state["show_about"] = not st.session_state.get("show_about")
 
@@ -916,51 +923,53 @@ c1, c2, _ = st.columns([1.6, 1, 4.4])
 with c1:
     ask = st.button("Search literature", type="primary", use_container_width=True)
 with c2:
-    st.button("Clear", use_container_width=True, on_click=_set_query, args=("",))
+    st.button("Clear", use_container_width=True, on_click=_clear_search)
 
-st.markdown('<div class="sec-sub" style="margin-top:1.25rem;">Try an example</div>',
-            unsafe_allow_html=True)
-cols = st.columns(3)
-for i, (tag, ex) in enumerate(EXAMPLES):
-    with cols[i]:
-        st.markdown(f'<div class="ex-card"><div class="ex-tag">{tag}</div>'
-                    f'<div class="ex-q">{ex}</div></div>', unsafe_allow_html=True)
-        st.button("Use this question", key=f"ex_{i}", use_container_width=True,
-                  on_click=_set_query, args=(ex,))
-
-if st.session_state.get("show_about"):
-    render_about()
-
-# ---- answer flow ----
+# ---- run the pipeline when "Search literature" is clicked ----
+# The completed result is kept in session state so the answer/evidence stay
+# rendered directly below the search controls on later reruns (theme switch,
+# expander toggles, ...), instead of vanishing when `ask` is False.
 if ask:
     query = (st.session_state.get("query_text") or "").strip()
     if not query:
         st.warning("Please enter a question first.")
-        st.stop()
-    if len(query) > 2000:
+        st.session_state.pop("last_result", None)
+        st.session_state.pop("last_gen", None)
+    elif len(query) > 2000:
         st.warning("That question is too long (over 2,000 characters). Please shorten it.")
-        st.stop()
-    try:
-        with st.status("Working through the literature…", expanded=True) as status:
-            status.write("Classifying query and retrieving evidence…")
-            result, gen = ask_pipeline(query, rerank_on)
-            status.write("Validating citations…")
-            status.update(label="Done", state="complete", expanded=False)
-    except RetrievalError:
-        st.error("**Database unreachable.** Start Neo4j (`bin/neo4j start`), "
-                 "check `SGRAG_NEO4J_PASSWORD`, then retry.")
-        log.error("retrieval failed:\n%s", traceback.format_exc())
-        st.stop()
-    except Exception:  # noqa: BLE001
-        st.error("Something went wrong while answering. Details are in the app log.")
-        log.error("pipeline failed:\n%s", traceback.format_exc())
-        st.stop()
+        st.session_state.pop("last_result", None)
+        st.session_state.pop("last_gen", None)
+    else:
+        try:
+            with st.status("Working through the literature…", expanded=True) as status:
+                status.write("Classifying query and retrieving evidence…")
+                result, gen = ask_pipeline(query, rerank_on)
+                status.write("Validating citations…")
+                status.update(label="Done", state="complete", expanded=False)
+        except RetrievalError:
+            st.session_state.pop("last_result", None)
+            st.session_state.pop("last_gen", None)
+            st.error("**Database unreachable.** Start Neo4j (`bin/neo4j start`), "
+                     "check `SGRAG_NEO4J_PASSWORD`, then retry.")
+            log.error("retrieval failed:\n%s", traceback.format_exc())
+        except Exception:  # noqa: BLE001
+            st.session_state.pop("last_result", None)
+            st.session_state.pop("last_gen", None)
+            st.error("Something went wrong while answering. Details are in the app log.")
+            log.error("pipeline failed:\n%s", traceback.format_exc())
+        else:
+            st.session_state["last_result"] = result
+            st.session_state["last_gen"] = gen
 
+# ---- results directly below the search controls, else the examples ----
+_last = st.session_state.get("last_result")
+_last_gen = st.session_state.get("last_gen")
+if _last is not None:
     # The generator degrades gracefully: a retrieval failure comes back as a
     # result carrying a "retrieval error:" warning (not a raised exception).
     # Present that as a clean, actionable error instead of raw socket details.
     retrieval_failed = any(
-        str(w).startswith("retrieval error:") for w in result.warnings)
+        str(w).startswith("retrieval error:") for w in _last.warnings)
 
     if retrieval_failed:
         st.error("**Database unreachable.** The literature database (Neo4j) "
@@ -968,17 +977,30 @@ if ask:
                  "Start Neo4j (`bin/neo4j start`), check `SGRAG_NEO4J_PASSWORD`, "
                  "then try again.")
     else:
-        render_answer(result)
-        if result.evidence:
-            render_evidence(result.evidence)
-            render_source_overview(result.evidence)
-        render_intelligence(result.retrieval_metadata or {},
-                            result.generation_metadata or {})
-        if result.evidence:
-            render_graph_section(result, gen)
-        render_diagnostics(result)
+        render_answer(_last)
+        if _last.evidence:
+            render_evidence(_last.evidence)
+            render_source_overview(_last.evidence)
+        render_intelligence(_last.retrieval_metadata or {},
+                            _last.generation_metadata or {})
+        if _last.evidence:
+            render_graph_section(_last, _last_gen)
+        render_diagnostics(_last)
 
-    st.button("↺ New search", key="btn_new", on_click=_set_query, args=("",))
+    st.button("↺ New search", key="btn_new", on_click=_clear_search)
+else:
+    st.markdown('<div class="sec-sub" style="margin-top:1.25rem;">Try an example</div>',
+                unsafe_allow_html=True)
+    cols = st.columns(3)
+    for i, (tag, ex) in enumerate(EXAMPLES):
+        with cols[i]:
+            st.markdown(f'<div class="ex-card"><div class="ex-tag">{tag}</div>'
+                        f'<div class="ex-q">{ex}</div></div>', unsafe_allow_html=True)
+            st.button("Use this question", key=f"ex_{i}", use_container_width=True,
+                      on_click=_set_query, args=(ex,))
+
+if st.session_state.get("show_about"):
+    render_about()
 
 st.markdown('<div class="footer">Scientific Literature GraphRAG · evidence-grounded '
             "biomedical QA · Neo4j + MiniLM + CrossEncoder</div>",

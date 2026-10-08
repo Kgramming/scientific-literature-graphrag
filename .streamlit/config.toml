@@ -5,3 +5,8 @@ backgroundColor = "#FAFAF7"
 secondaryBackgroundColor = "#F1EDE6"
 textColor = "#1C1E21"
 font = "sans serif"
+
+[client]
+# Minimal presentation mode: hides Streamlit's own toolbar (Deploy, etc.)
+# so only the application UI is visible. Official config mechanism.
+toolbarMode = "minimal"
