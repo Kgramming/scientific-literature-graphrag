@@ -381,15 +381,18 @@ section[data-testid="stSidebar"] { background: var(--th-sidebar-bg); }
 .side-stat a { color: var(--th-link); }
 
 /* ---- native Streamlit widgets ---- */
-button[data-testid="stBaseButton-secondary"] {
+button[data-testid="stBaseButton-secondary"],
+button[data-testid="stPopoverButton"] {
     background: var(--th-btn-sec-bg); color: var(--th-btn-sec-text);
     border: 1px solid var(--th-btn-sec-border); border-radius: 10px;
 }
-button[data-testid="stBaseButton-secondary"]:hover {
+button[data-testid="stBaseButton-secondary"]:hover,
+button[data-testid="stPopoverButton"]:hover {
     border-color: var(--th-accent); color: var(--th-accent);
     background: var(--th-btn-sec-bg);
 }
-button[data-testid="stBaseButton-secondary"]:focus-visible {
+button[data-testid="stBaseButton-secondary"]:focus-visible,
+button[data-testid="stPopoverButton"]:focus-visible {
     outline: 2px solid var(--th-accent); outline-offset: 2px;
 }
 button[data-testid="stBaseButton-primary"] {
@@ -414,41 +417,36 @@ div[data-testid="stTextArea"] textarea:focus {
     border-color: var(--th-accent); box-shadow: 0 0 0 1px var(--th-accent);
     outline: none;
 }
-/* selectbox: the visible control is div[role="group"] containing
-   input[role="combobox"] (value) and the arrow button */
-div[data-testid="stSelectbox"] div[role="group"] {
-    background: var(--th-input-bg); border: 1px solid var(--th-input-border);
-    border-radius: 10px;
+/* theme picker label (small caps, matches sidebar section style) */
+.theme-picker-label {
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--th-faint); font-weight: 600; margin: 0 0 0.35rem 0;
 }
-div[data-testid="stSelectbox"] div[role="group"]:focus-within {
-    border-color: var(--th-accent); box-shadow: 0 0 0 1px var(--th-accent);
-}
-div[data-testid="stSelectbox"] input[role="combobox"] {
-    background: transparent; color: var(--th-input-text);
-}
-div[data-testid="stSelectbox"] div[role="group"] button {
-    background: transparent; border: none; color: var(--th-muted);
-}
-div[data-testid="stSelectbox"] div[role="group"] button:hover {
-    color: var(--th-accent); background: transparent;
-}
-div[data-testid="stSelectbox"] div[role="group"] button svg {
-    color: var(--th-muted);
-}
-/* dropdown menu (rendered in a body-level portal) */
-div[role="listbox"] {
+/* popover dialog: theme-aware surface, compact */
+div[data-testid="stPopoverBody"] {
     background: var(--th-card-bg); border: 1px solid var(--th-card-border);
-    border-radius: 10px; overflow: hidden;
+    border-radius: 12px; padding: 0.5rem; min-width: 220px;
 }
-div[role="option"] { color: var(--th-text); background: transparent; }
-div[role="option"]:hover { background: var(--th-accent-soft); color: var(--th-heading); }
-div[role="option"][aria-selected="true"] {
-    background: var(--th-accent-soft); color: var(--th-accent);
-    font-weight: 600;
+/* theme option buttons inside the popover: compact dropdown-like list */
+div[data-testid="stPopoverBody"] div[data-testid="stButton"] {
+    margin: 0;
 }
-/* widget labels: selectbox uses label > ... > p, toggle uses
-   div[data-testid="stWidgetLabel"] > ... > p (no label element) */
-div[data-testid="stSelectbox"] label p,
+div[data-testid="stPopoverBody"] div[data-testid="stButton"] button {
+    text-align: left; font-weight: 500; padding: 0.35rem 0.75rem;
+    min-height: 0; line-height: 1.4;
+}
+div[data-testid="stPopoverBody"] div[data-testid="stButton"] button[kind="secondary"] {
+    color: var(--th-text); border-color: transparent; background: transparent;
+}
+div[data-testid="stPopoverBody"] div[data-testid="stButton"] button[kind="secondary"]:hover {
+    color: var(--th-heading); border-color: transparent;
+    background: var(--th-accent-soft);
+}
+div[data-testid="stPopoverBody"] div[data-testid="stButton"] button[kind="primary"] {
+    border-color: transparent;
+}
+/* widget labels: toggle uses div[data-testid="stWidgetLabel"] > ... > p
+   (no label element) */
 div[data-testid="stWidgetLabel"] p {
     color: var(--th-text);
 }
@@ -864,9 +862,9 @@ def _toggle_about():
 
 st.set_page_config(page_title="Scientific Literature GraphRAG", layout="wide")
 
-# Theme is read from session state (persisted across reruns); the selectbox
-# in the sidebar updates it and the new CSS applies on the next render —
-# no restart required.
+# Theme is read from session state (persisted across reruns); the theme
+# picker popover in the sidebar updates it and the new CSS applies on the
+# next render — no restart required.
 theme_name = st.session_state.get("theme_name", DEFAULT_THEME)
 if theme_name not in THEMES:
     theme_name = DEFAULT_THEME
@@ -898,8 +896,26 @@ with st.sidebar:
     st.markdown("---")
     rerank_on = st.toggle("CrossEncoder reranking", value=True,
                           help="Reorder top candidates with the cross-encoder")
-    st.selectbox("Theme", options=list(THEMES.keys()), key="theme_name",
-                 help="Interface color theme — applies instantly, no restart needed")
+    # Theme selector: a compact popover listing all themes. The native
+    # st.selectbox dropdown misbehaves in small viewports (its portal menu
+    # becomes over-tall, won't scroll, and clips lower options), so this
+    # custom control replaces it. Theme state stays in
+    # st.session_state["theme_name"]; picking a theme triggers the normal
+    # button rerun and the new CSS applies instantly, no restart needed.
+    st.markdown('<div class="theme-picker-label">Theme</div>', unsafe_allow_html=True)
+    with st.popover(theme_name, icon="🎨", use_container_width=True,
+                    help="Interface color theme — applies instantly, no restart needed"):
+        for _tname in THEMES:
+            _active = _tname == theme_name
+            if st.button(f"{'●' if _active else '○'}  {_tname}",
+                         key=f"theme_pick_{_tname}",
+                         use_container_width=True,
+                         type="primary" if _active else "secondary"):
+                if not _active:
+                    # theme_name is read at the top of the script, before this
+                    # handler runs, so rerun explicitly to apply it immediately.
+                    st.session_state["theme_name"] = _tname
+                    st.rerun()
     st.markdown("---")
     st.button("About this system", use_container_width=True,
               on_click=_toggle_about)
